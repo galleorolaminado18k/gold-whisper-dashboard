@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prompt Maestro - Dashboard Joyería Premium</title>
+    <meta name="description" content="Dashboard de Inteligencia Comercial para Joyería en Oro Laminado 18K y Balinería Premium" />
+    <meta name="author" content="Prompt Maestro" />
+
+    <meta property="og:title" content="Prompt Maestro - Dashboard Joyería Premium" />
+    <meta property="og:description" content="Dashboard de Inteligencia Comercial para Joyería en Oro Laminado 18K y Balinería Premium" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@lovable_dev" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <!-- ADICIONES SEGURAS (no se eliminó nada) -->
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" href="/favicon.ico" />
+    <!-- Si algún día sirves por HTTPS y cargas algo HTTP, esta línea evita mixed-content -->
+    <!-- <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests"> -->
+  </head>
+
+  <body>
+    <div id="root"></div>
+
+    <!-- Tu app (Vite) -->
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Chatwoot Website Widget (se añadió try/catch y comprobaciones) -->
+    <script>
+      (function (d, t) {
+        try {
+          var BASE_URL = "http://localhost:3020"; // cambia si tu chatwoot corre en otro host/puerto
+          var g = d.createElement(t), s = d.getElementsByTagName(t)[0];
+          g.src = BASE_URL + "/packs/js/sdk.js";
+          g.async = true; g.defer = true;
+          s.parentNode.insertBefore(g, s);
+          g.onload = function () {
+            if (window.chatwootSDK && typeof window.chatwootSDK.run === "function") {
+              window.chatwootSDK.run({
+                websiteToken: "MVw8vQMvL3x7gTDyxXJ82Gvd", // tu token
+                baseUrl: BASE_URL
+              });
+            } else {
+              console.warn("Chatwoot SDK no cargó correctamente.");
+            }
+          };
+          g.onerror = function () {
+            console.warn("No fue posible cargar el SDK de Chatwoot desde:", g.src);
+          };
+        } catch (e) {
+          console.warn("Error inicializando Chatwoot:", e);
+        }
+      })(document, "script");
+    </script>
+
+    <noscript>
+      Habilita JavaScript para usar la aplicación.
+    </noscript>
+  </body>
+</html>
