@@ -26,10 +26,7 @@ jobs:
           echo $PATH
 
       - name: Install dependencies
-        run: npm install
-
-      - name: Audit and fix npm vulnerabilities
-        run: npm audit fix || true # '|| true' para que no falle si hay vulnerabilidades no corregibles
+        run: npm ci
 
       - name: List node_modules content (for debugging)
         run: ls -la node_modules
