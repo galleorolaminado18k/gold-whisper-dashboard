@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # Añadir permisos de escritura para el bot de GitHub Actions
+    env:
+      VITE_SUPABASE_URL: https://evjgujyjpjlvbudgfwr.supabase.co
+      VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2amd1aml5anBsdmJ1ZGdmaXdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwOTc4NzIsImV4cCI6MjA3NTY3Mzg3Mn0.EnJIuzxjw6tpURxclEZ60ySDqKkz6vltjSQPEWHtYzI
 
     steps:
       - name: Checkout 🛎️
