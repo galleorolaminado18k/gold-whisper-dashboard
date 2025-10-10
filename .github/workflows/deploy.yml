@@ -8,6 +8,8 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Añadir permisos de escritura para el bot de GitHub Actions
 
     steps:
       - name: Checkout 🛎️
