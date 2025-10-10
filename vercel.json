@@ -1,22 +1,10 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/dist/index.html" }
   ],
   "build": {
-    "env": {
-      "VITE_SUPABASE_URL": "@vite_supabase_url",
-      "VITE_SUPABASE_ANON_KEY": "@vite_supabase_anon_key",
-      "VITE_CHATWOOT_URL": "@vite_chatwoot_url",
-      "VITE_CHATWOOT_ACCOUNT_ID": "@vite_chatwoot_account_id",
-      "VITE_CHATWOOT_USER_TOKEN": "@vite_chatwoot_user_token",
-      "VITE_META_BUSINESS_ID": "@vite_meta_business_id",
-      "VITE_META_ACCESS_TOKEN": "@vite_meta_access_token",
-      "VITE_META_AD_ACCOUNT_IDS": "@vite_meta_ad_account_ids",
-      "VITE_META_AD_ACCOUNT_NAMES": "@vite_meta_ad_account_names",
-      "VITE_META_AD_ACCOUNT_ID": "@vite_meta_ad_account_id",
-      "VITE_META_AD_ACCOUNT_NAME": "@vite_meta_ad_account_name"
-    },
-    "command": "npm run build",
-    "outputDirectory": "dist"
+    // Eliminar la propiedad 'command' ya que no es válida
+    // "command": "npm run build",
+    "output": "dist"
   }
 }
