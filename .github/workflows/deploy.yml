@@ -19,13 +19,20 @@ jobs:
           node-version: '20' # Asegúrate de que esta versión sea compatible con tu proyecto
           cache: 'npm' # Habilitar caché para npm
 
-      - name: Display Node.js and npm versions
+      - name: Display Node.js and npm versions and PATH
         run: |
           node -v
           npm -v
+          echo $PATH
 
       - name: Install dependencies
         run: npm install
+
+      - name: Audit and fix npm vulnerabilities
+        run: npm audit fix || true # '|| true' para que no falle si hay vulnerabilidades no corregibles
+
+      - name: List node_modules content (for debugging)
+        run: ls -la node_modules
 
       - name: Build project
         run: npm run build
