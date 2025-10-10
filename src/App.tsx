@@ -27,12 +27,22 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App: React.FC = () => {
+  const rawBase =
+    import.meta.env.VITE_ROUTER_BASENAME ??
+    import.meta.env.BASE_URL ??
+    "/";
+
+  const normalizedBase =
+    rawBase === "/"
+      ? ""
+      : rawBase.replace(/\/+$/, "") || "";
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter basename="/dashboard">
+        <BrowserRouter basename={normalizedBase}>
           <AuthProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
