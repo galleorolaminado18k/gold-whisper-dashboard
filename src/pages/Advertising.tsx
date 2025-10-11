@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -354,7 +354,32 @@ const Advertising = () => {
   );
 
   // Obtener anuncios de conjuntos seleccionados
-  const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
+  
+  // Scroll sync: tabla y barra horizontal pegajosa
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const [contentWidth, setContentWidth] = useState<number>(2000);
+
+  useLayoutEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    const update = () => setContentWidth(el.scrollWidth);
+    update();
+    const ro = new (window as any).ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener('resize', update);
+    return () => { try { ro.disconnect(); } catch {} window.removeEventListener('resize', update); };
+  }, []);
+
+  const handleMainScroll = () => {
+    const a = tableScrollRef.current, b = topScrollRef.current;
+    if (a && b && b.scrollLeft !== a.scrollLeft) b.scrollLeft = a.scrollLeft;
+  };
+  const handleTopScroll = () => {
+    const a = tableScrollRef.current, b = topScrollRef.current;
+    if (a && b && a.scrollLeft !== b.scrollLeft) a.scrollLeft = b.scrollLeft;
+  };
+const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
     (adSetId) => adsData.get(adSetId) || []
   );
 
@@ -693,7 +718,7 @@ const Advertising = () => {
         </div>
 
         {/* Tabla principal - Estilo profesional Meta */}
-        <div className="flex-1 bg-white relative" style={{ overflowX: 'scroll', overflowY: 'auto' }}>
+        <div className="flex-1 bg-white relative" ref={tableScrollRef} style={{ overflowX: "auto", overflowY: "auto" }} onScroll={handleMainScroll}>
           <Table className="w-full" style={{ minWidth: '2000px' }}>
             <TableHeader className="sticky top-0 bg-gray-50 z-10">
               <TableRow className="border-b-2">
@@ -1068,7 +1093,11 @@ const Advertising = () => {
               )}
             </TableBody>
           </Table>
-
+            <div className="sticky bottom-0 left-0 w-full bg-white border-t z-20">
+              <div ref={topScrollRef} className="overflow-x-auto overflow-y-hidden h-4" onScroll={handleTopScroll}>
+                <div style={{ width: contentWidth }} />
+              </div>
+            </div>
           {loading && campaniasFiltradas.length === 0 && (
             <div className="text-center py-12">
               <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
@@ -1124,5 +1153,8 @@ const Advertising = () => {
 };
 
 export default Advertising;
+
+
+
 
 
