@@ -41,38 +41,7 @@
       })();
     </script>
 
-    <!-- Chatwoot Website Widget (condicional por ENV y seguro) -->
-    <script type="module">
-      const ENABLED = "%VITE_CHATWOOT_ENABLED%" === "true";
-      const BASE_URL = "%VITE_CHATWOOT_URL%" || "http://localhost:3020";
-      const WEBSITE_TOKEN = "%VITE_CHATWOOT_WEBSITE_TOKEN%" || "";
-
-      if (ENABLED && BASE_URL && WEBSITE_TOKEN) {
-        try {
-          const g = document.createElement("script");
-          const s = document.getElementsByTagName("script")[0];
-          g.src = BASE_URL.replace(/\/$/, "") + "/packs/js/sdk.js";
-          g.async = true;
-          g.defer = true;
-          s.parentNode.insertBefore(g, s);
-          g.onload = function () {
-            if (window.chatwootSDK && typeof window.chatwootSDK.run === "function") {
-              window.chatwootSDK.run({
-                websiteToken: WEBSITE_TOKEN,
-                baseUrl: BASE_URL,
-              });
-            } else {
-              console.warn("Chatwoot SDK no cargó correctamente.");
-            }
-          };
-          g.onerror = function () {
-            console.warn("No fue posible cargar el SDK de Chatwoot desde:", g.src);
-          };
-        } catch (e) {
-          console.warn("Error inicializando Chatwoot:", e);
-        }
-      }
-    </script>
+    <!-- Chatwoot se inicializa desde src/lib/chatwootWidget.ts -->
 
     <noscript>
       Habilita JavaScript para usar la aplicación.

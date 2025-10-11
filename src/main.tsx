@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { initChatwootWidget } from "@/lib/chatwootWidget";
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
@@ -13,3 +14,6 @@ ReactDOM.createRoot(rootElement).render(
     <App />
   </React.StrictMode>
 );
+
+// Inicializa Chatwoot (si está habilitado por ENV)
+initChatwootWidget();
