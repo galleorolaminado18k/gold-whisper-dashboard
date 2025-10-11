@@ -479,8 +479,8 @@ const Advertising = () => {
     <DashboardLayout>
       <div className="flex flex-col h-full">
         {/* Header Professional */}
-        <div className="bg-white border-b px-6 py-4">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white border-b px-6 py-3">
+          <div className="flex items-center justify-between mb-2">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Administrador de anuncios</h1>
               <p className="text-sm text-gray-500 mt-1">Gestiona tus campañas publicitarias</p>
@@ -530,7 +530,7 @@ const Advertising = () => {
           </div>
 
           {/* Indicador de datos reales - SIEMPRE visible */}
-          <div className="mb-3 flex items-center gap-2 text-sm">
+          <div className="mb-2 flex items-center gap-2 text-sm">
             {loading ? (
               <>
                 <Badge variant="default" className="bg-blue-500">
@@ -617,7 +617,7 @@ const Advertising = () => {
         </div>
 
         {/* Barra de herramientas - Estilo Meta Ads */}
-        <div className="bg-gray-50 border-b px-6 py-3">
+        <div className="bg-white border-b px-6 py-2">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className="relative">
@@ -1120,3 +1120,4 @@ const Advertising = () => {
 };
 
 export default Advertising;
+
