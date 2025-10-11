@@ -858,7 +858,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm leading-tight truncate max-w-[360px] sm:max-w-[420px]" title={campaign.nombre}>{clampName(campaign.nombre)}</p>
+                          <p className="font-medium text-sm whitespace-nowrap" title={campaign.nombre}>{campaign.nombre}</p>
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -997,7 +997,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                           <div className="flex items-center gap-2">
                             <Folder className="w-10 h-10 p-2 rounded-full bg-blue-100 text-blue-600" />
                             <div>
-                              <p className="font-medium text-sm leading-tight truncate max-w-[360px] sm:max-w-[420px]" title={adSet.name}>{clampName(adSet.name)}</p>
+                              <p className="font-medium text-sm whitespace-nowrap" title={adSet.name}>{adSet.name}</p>
                               <p className="text-xs text-gray-500">Conjunto de anuncios • ID: {adSet.id}</p>
                             </div>
                           </div>
