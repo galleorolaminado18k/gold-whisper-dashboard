@@ -13,8 +13,7 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://evjgujiyjplvbudgfiwr.supabase.co
       VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2amd1aml5anBsdmJ1ZGdmaXdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwOTc4NzIsImV4cCI6MjA3NTY3Mzg3Mn0.EnJIuzxjw6tpURxclEZ60ySDqKkz6vltjSQPEWHtYzI
-      VITE_CHATWOOT_ENABLED: false
-      # Para habilitar el widget de Chatwoot en producción, cambia a true y define los secretos
+      # Para habilitar el widget de Chatwoot en producción, define los secretos
       # en Settings > Secrets and variables > Actions del repositorio:
       #   VITE_CHATWOOT_WEBSITE_TOKEN = <tu token del widget>
       VITE_CHATWOOT_ENABLED: true
