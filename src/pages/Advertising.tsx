@@ -94,8 +94,8 @@ interface CampaignData {
 
 
 // Limite de caracteres visibles para nombres largos en tabla
-const NAME_MAX = 28;\r\nconst clampName = (s: string) => (s && s.length > NAME_MAX ? s.slice(0, NAME_MAX) + "Ö" : s);
-
+const NAME_MAX = 28;
+const clampName = (s: string) => (s && s.length > NAME_MAX ? s.slice(0, NAME_MAX) + "..." : s);
 // Funci√≥n para transformar datos de Meta a formato de vista
 function transformMetaCampaign(metaCampaign: MetaCampaign): CampaignData {
   const insights = metaCampaign.insights;
