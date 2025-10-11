@@ -1,16 +1,15 @@
 <!doctype html>
 <html>
   <head>
-    <meta charset="utf-8">
-    <title>Redirectingâ€¦</title>
-    <meta http-equiv="refresh" content="0; url=/">
+    <meta charset="utf-8" />
+    <title>Redirecting…</title>
+    <meta http-equiv="refresh" content="0; url=/" />
     <script>
-      // Para SPAs: reintenta con la raÃ­z conservando la ruta
-      sessionStorage.setItem('redirectAfterReload', window.location.pathname + window.location.search + window.location.hash);
-      window.location.replace('/');
+      try {
+        sessionStorage.setItem('redirectAfterReload', location.pathname + location.search + location.hash);
+      } catch (e) {}
+      location.replace('/');
     </script>
   </head>
-  <body>
-    Redirectingâ€¦
-  </body>
+  <body>Redirecting…</body>
 </html>

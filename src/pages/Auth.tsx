@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,16 @@ const Auth = () => {
       confirmPassword: "",
     },
   });
+
+  // Forzar autocomplete="new-password" en el formulario de registro
+  useEffect(() => {
+    const form = document.querySelector('form[data-form="signup"]') as HTMLFormElement | null;
+    if (form) {
+      const pwInputs = form.querySelectorAll('input[type="password"]');
+      pwInputs.forEach((el) => el.setAttribute('autocomplete', 'new-password'));
+      form.setAttribute('autocomplete', 'new-password');
+    }
+  }, []);
 
   // Redirect if already logged in
   if (user) {
@@ -198,7 +208,7 @@ const Auth = () => {
                         <FormItem>
                           <FormControl>
                             <Input
-                              type="email"
+                              type="email" autoComplete="email"
                               placeholder="Email"
                               {...field}
                               disabled={loading}
@@ -217,7 +227,7 @@ const Auth = () => {
                         <FormItem>
                           <FormControl>
                             <Input
-                              type="password"
+                              type="password" autoComplete="current-password"
                               placeholder="Contraseña"
                               {...field}
                               disabled={loading}
@@ -251,7 +261,7 @@ const Auth = () => {
 
               <TabsContent value="signup">
                 <Form {...signUpForm}>
-                  <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
+                  <form data-form="signup" onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
                     <FormField
                       control={signUpForm.control}
                       name="fullName"
@@ -277,7 +287,7 @@ const Auth = () => {
                         <FormItem>
                           <FormControl>
                             <Input
-                              type="email"
+                              type="email" autoComplete="email"
                               placeholder="Email"
                               {...field}
                               disabled={loading}
@@ -296,7 +306,7 @@ const Auth = () => {
                         <FormItem>
                           <FormControl>
                             <Input
-                              type="password"
+                              type="password" autoComplete="current-password"
                               placeholder="Contraseña"
                               {...field}
                               disabled={loading}
@@ -315,7 +325,7 @@ const Auth = () => {
                         <FormItem>
                           <FormControl>
                             <Input
-                              type="password"
+                              type="password" autoComplete="current-password"
                               placeholder="Confirmar Contraseña"
                               {...field}
                               disabled={loading}
@@ -349,3 +359,5 @@ const Auth = () => {
 };
 
 export default Auth;
+
+

@@ -2,26 +2,36 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const DEFAULT_SUPABASE_URL = "https://evjgujiyjplvbudgfiwr.supabase.co";
+const SUPABASE_URL_RAW = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
   import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Valores por defecto si no están configuradas las variables
-const DEFAULT_URL = "https://placeholder.supabase.co";
-const DEFAULT_KEY = "placeholder-anon-key";
+// Valida que la URL sea del formato correcto; si no, hace fallback
+const VALID_HOST = /^https:\/\/[a-z0-9]{20}\.supabase\.co$/;
+const SUPABASE_URL =
+  SUPABASE_URL_RAW && VALID_HOST.test(SUPABASE_URL_RAW)
+    ? SUPABASE_URL_RAW
+    : DEFAULT_SUPABASE_URL;
 
-const finalUrl = SUPABASE_URL || DEFAULT_URL;
-const finalKey = SUPABASE_ANON_KEY || DEFAULT_KEY;
+if (SUPABASE_URL_RAW && !VALID_HOST.test(SUPABASE_URL_RAW)) {
+  // avisa en consola si había una URL inválida (typo de DNS)
+  console.warn(
+    `[Supabase] VITE_SUPABASE_URL inválida ('${SUPABASE_URL_RAW}'). Usando fallback '${DEFAULT_SUPABASE_URL}'.`
+  );
+}
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn("[Supabase] Usando valores por defecto. Configura VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY para funcionalidad completa.");
+  throw new Error(
+    "[Supabase] Missing env vars: define VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY)."
+  );
 }
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(finalUrl, finalKey, {
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,

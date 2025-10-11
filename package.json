@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://galleorolaminado18k.github.io/gold-whisper-dashboard",
+  "homepage": "https://dashboard.galle18k.com",
   "scripts": {
     "dev": "vite",
     "build": "npx vite build",

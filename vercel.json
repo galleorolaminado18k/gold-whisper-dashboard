@@ -14,7 +14,9 @@
       "VITE_META_AD_ACCOUNT_IDS": "@vite_meta_ad_account_ids",
       "VITE_META_AD_ACCOUNT_NAMES": "@vite_meta_ad_account_names",
       "VITE_META_AD_ACCOUNT_ID": "@vite_meta_ad_account_id",
-      "VITE_META_AD_ACCOUNT_NAME": "@vite_meta_ad_account_name"
+      "VITE_META_AD_ACCOUNT_NAME": "@vite_meta_ad_account_name",
+      "VITE_CHATWOOT_ENABLED": "@vite_chatwoot_enabled",
+      "VITE_CHATWOOT_WEBSITE_TOKEN": "@vite_chatwoot_website_token"
     }
   }
 }

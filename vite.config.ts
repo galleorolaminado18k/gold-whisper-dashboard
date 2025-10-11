@@ -3,7 +3,12 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+const base = process.env.VITE_ASSET_BASE?.trim()
+  ? process.env.VITE_ASSET_BASE
+  : "/";
+
 export default defineConfig({
+  base,
   plugins: [react()],
   resolve: {
     alias: {
@@ -35,7 +40,7 @@ export default defineConfig({
   preview: {
     port: 8082,          // puerto de preview
     host: "localhost",
-    strictPort: true,
+    strictPort: false,   // permite elegir siguiente puerto libre
     cors: true,
   },
 });
