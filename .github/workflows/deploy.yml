@@ -19,6 +19,9 @@ jobs:
       VITE_CHATWOOT_ENABLED: true
       VITE_CHATWOOT_URL: https://app.chatwoot.com
       VITE_CHATWOOT_WEBSITE_TOKEN: ${{ secrets.VITE_CHATWOOT_WEBSITE_TOKEN }}
+      # Bridge API (para CRM y envío de mensajes)
+      VITE_BRIDGE_API_URL: ${{ secrets.VITE_BRIDGE_API_URL }}
+      VITE_CHATWOOT_ACCOUNT_ID: ${{ secrets.VITE_CHATWOOT_ACCOUNT_ID }}
 
     steps:
       - name: Checkout 🛎️
