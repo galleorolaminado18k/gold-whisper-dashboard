@@ -92,6 +92,10 @@ interface CampaignData {
   account_name?: string;
 }
 
+
+// Limite de caracteres visibles para nombres largos en tabla
+const NAME_MAX = 32;
+
 // Función para transformar datos de Meta a formato de vista
 function transformMetaCampaign(metaCampaign: MetaCampaign): CampaignData {
   const insights = metaCampaign.insights;
@@ -824,7 +828,7 @@ const Advertising = () => {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm truncate max-w-[420px] sm:max-w-[520px]" title={campaign.nombre}>{campaign.nombre}</p>
+                          <p className="font-medium text-sm whitespace-nowrap" title={campaign.nombre}>{campaign.nombre.length > NAME_MAX ? campaign.nombre.slice(0, NAME_MAX) + "�" : campaign.nombre}</p>
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -963,7 +967,7 @@ const Advertising = () => {
                           <div className="flex items-center gap-2">
                             <Folder className="w-10 h-10 p-2 rounded-full bg-blue-100 text-blue-600" />
                             <div>
-                              <p className="font-medium text-sm truncate max-w-[420px] sm:max-w-[520px]" title={adSet.name}>{adSet.name}</p>
+                              <p className="font-medium text-sm whitespace-nowrap" title={adSet.name}>{adSet.name.length > NAME_MAX ? adSet.name.slice(0, NAME_MAX) + "." : adSet.name}</p>
                               <p className="text-xs text-gray-500">Conjunto de anuncios • ID: {adSet.id}</p>
                             </div>
                           </div>
@@ -1120,4 +1124,5 @@ const Advertising = () => {
 };
 
 export default Advertising;
+
 
