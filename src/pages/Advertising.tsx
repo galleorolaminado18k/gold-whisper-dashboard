@@ -719,6 +719,11 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
 
         {/* Tabla principal - Estilo profesional Meta */}
         <div className="flex-1 bg-white relative" ref={tableScrollRef} style={{ overflowX: "auto", overflowY: "auto" }} onScroll={handleMainScroll}>
+            <div className="sticky top-0 left-0 w-full bg-white z-20">
+              <div ref={topScrollRef} className="overflow-x-auto overflow-y-hidden h-3" onScroll={handleTopScroll}>
+                <div style={{ width: contentWidth }} />
+              </div>
+            </div>
           <Table className="w-full" style={{ minWidth: '2000px' }}>
             <TableHeader className="sticky top-0 bg-gray-50 z-10">
               <TableRow className="border-b-2">
@@ -1093,20 +1098,15 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
               )}
             </TableBody>
           </Table>
-            <div className="sticky bottom-0 left-0 w-full bg-white border-t z-20">
-              <div ref={topScrollRef} className="overflow-x-auto overflow-y-hidden h-4" onScroll={handleTopScroll}>
-                <div style={{ width: contentWidth }} />
+            {loading && campaniasFiltradas.length === 0 && (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
+                <p className="text-gray-700 font-medium">Cargando campañas desde Meta Ads...</p>
+                <p className="text-gray-500 text-sm mt-2">
+                  Conectando con {getAdAccounts().length} cuentas publicitarias
+                </p>
               </div>
-            </div>
-          {loading && campaniasFiltradas.length === 0 && (
-            <div className="text-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
-              <p className="text-gray-700 font-medium">Cargando campaÃ±as desde Meta Ads...</p>
-              <p className="text-gray-500 text-sm mt-2">
-                Conectando con {getAdAccounts().length} cuentas publicitarias
-              </p>
-            </div>
-          )}
+            )}
           
           {!loading && campaniasFiltradas.length === 0 && (
             <div className="text-center py-12">
