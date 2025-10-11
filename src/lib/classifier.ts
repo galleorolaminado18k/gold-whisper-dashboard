@@ -72,6 +72,13 @@ const RE = {
     /pago\s+recibido|comprobante\s+validado|pagaste|transferencia\s+confirmada/,
     /pedido\s+(confirmado|alistado|preparado)|despacho\s+hoy/,
   ],
+  // Confirmación explícita del cliente
+  confirmacionPedido: [
+    /\bconfirmo\b/,
+    /\bconfirmado\b/,
+    /pedido\s+confirmado/,
+    /listo\s+para\s+despacho/,
+  ],
   generandoGuia: [
     /te\s+paso\s+la\s+gu[ií]a|en\s+cuanto\s+salga\s+la\s+gu[ií]a/,
     /generando\s+gu[ií]a|creando\s+gu[ií]a|imprimiendo\s+gu[ií]a/,
@@ -105,7 +112,11 @@ export function classifyStage(messages: CWMessage[] = []): CRMStageId {
 
   if (RE.guiaEnviada.some((r) => r.test(hist))) return "pedido_completo";
 
-  if (RE.pagoConfirmado.some((r) => r.test(hist)) || RE.generandoGuia.some((r) => r.test(hist))) {
+  if (
+    RE.pagoConfirmado.some((r) => r.test(hist)) ||
+    RE.generandoGuia.some((r) => r.test(hist)) ||
+    RE.confirmacionPedido.some((r) => r.test(hist))
+  ) {
     return "pendiente_guia";
   }
 
