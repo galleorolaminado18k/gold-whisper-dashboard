@@ -29,6 +29,18 @@
     <!-- Tu app (Vite) -->
     <script type="module" src="/src/main.tsx"></script>
 
+    <!-- Forzar HTTPS en producción en caso de proxies sin redirección -->
+    <script>
+      (function(){
+        try {
+          var isLocal = /^(localhost|127\.0\.0\.1)/.test(location.hostname);
+          if (!isLocal && location.protocol !== 'https:') {
+            location.href = 'https://' + location.host + location.pathname + location.search + location.hash;
+          }
+        } catch (e) {}
+      })();
+    </script>
+
     <!-- Chatwoot Website Widget (condicional por ENV y seguro) -->
     <script type="module">
       const ENABLED = "%VITE_CHATWOOT_ENABLED%" === "true";
