@@ -725,7 +725,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
               </div>
             </div>
           <Table className="w-full" style={{ minWidth: '2000px' }}>
-            <TableHeader className="sticky top-0 bg-gray-50 z-10">
+            <TableHeader className="sticky top-3 bg-gray-50 z-30 shadow-sm">
               <TableRow className="border-b-2">
                 <TableHead className="w-[50px]">
                   <input type="checkbox" className="rounded" />
