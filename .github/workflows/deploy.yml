@@ -18,10 +18,10 @@ jobs:
       #   VITE_CHATWOOT_WEBSITE_TOKEN = <tu token del widget>
       VITE_CHATWOOT_ENABLED: true
       VITE_CHATWOOT_URL: https://app.chatwoot.com
-      VITE_CHATWOOT_WEBSITE_TOKEN: ${{ secrets.VITE_CHATWOOT_WEBSITE_TOKEN }}
+      VITE_CHATWOOT_WEBSITE_TOKEN: c5S9SqxkumtX7GAZdc9LQnri
       # Bridge API (para CRM y envío de mensajes)
-      VITE_BRIDGE_API_URL: ${{ secrets.VITE_BRIDGE_API_URL }}
-      VITE_CHATWOOT_ACCOUNT_ID: ${{ secrets.VITE_CHATWOOT_ACCOUNT_ID }}
+      VITE_BRIDGE_API_URL: https://chatwoot-proxy-galle.galleorolaminado18k.workers.dev
+      VITE_CHATWOOT_ACCOUNT_ID: 138167
 
     steps:
       - name: Checkout 🛎️
