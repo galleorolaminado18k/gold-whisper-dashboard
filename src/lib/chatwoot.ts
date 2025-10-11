@@ -18,6 +18,7 @@ export type CWConversation = {
   inbox_id?: number;
   last_activity_at?: number; // epoch seconds
   messages?: CWMessage[]; // opcionalmente embebidos
+  labels?: string[];
 };
 
 // ===== Config del bridge local =====
@@ -63,6 +64,19 @@ function normConversation(c: Record<string, unknown>): CWConversation {
   const inboxVal = (c as Record<string, unknown>)["inbox_id"];
   const lastActVal = (c as Record<string, unknown>)["last_activity_at"];
 
+  const labelsVal = (c as Record<string, unknown>)["labels"] as unknown;
+  let labels: string[] | undefined = undefined;
+  if (Array.isArray(labelsVal)) {
+    const asStrings = labelsVal.filter((x) => typeof x === 'string') as string[];
+    if (asStrings.length === labelsVal.length) {
+      labels = asStrings;
+    } else {
+      const fromObjs = (labelsVal as unknown[])
+        .map((x) => (x && typeof x === 'object' ? (x as Record<string, unknown>)["title"] : undefined))
+        .filter((t) => typeof t === 'string') as string[];
+      labels = fromObjs.length ? fromObjs : undefined;
+    }
+  }
   return {
     id: (c?.id as number | string) ?? 0,
     contact: ((c as Record<string, unknown>)["contact"] as Record<string, unknown>) ?? {},
@@ -72,6 +86,7 @@ function normConversation(c: Record<string, unknown>): CWConversation {
         ? (lastActVal as number)
         : Number(lastActVal) || undefined,
     messages: msgsRaw.map((m) => normMessage(m as Record<string, unknown>)),
+    labels,
   };
 }
 
@@ -102,6 +117,76 @@ export async function fetchConversations(): Promise<CWConversation[]> {
   }
   const raw = await r.json().catch(() => []);
   return normConversationsResponse(raw);
+}
+
+// Conversaciones filtradas por etiqueta (usa endpoint extendido del bridge)
+export async function fetchConversationsByLabel(label: string): Promise<CWConversation[]> {
+  try {
+    const qs = new URLSearchParams({ labels: label }).toString();
+    const r = await fetch(`${API}/conversations-by-label?${qs}`);
+    if (!r.ok) return [];
+    const raw = await r.json().catch(() => []);
+    return normConversationsResponse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export async function countConversationsByLabel(label: string): Promise<number> {
+  const list = await fetchConversationsByLabel(label);
+  return Array.isArray(list) ? list.length : 0;
+}
+
+// Etiquetas utilitarias
+export async function addConversationLabels(
+  conversationId: number | string,
+  labels: string[]
+): Promise<boolean> {
+  try {
+    const r = await fetch(`${API}/conversations/${conversationId}/labels`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ labels }),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteConversationLabel(
+  conversationId: number | string,
+  label: string
+): Promise<boolean> {
+  try {
+    const r = await fetch(`${API}/conversations/${conversationId}/labels/${encodeURIComponent(label)}`, {
+      method: 'DELETE',
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+import type { CRMStageId } from "@/lib/crmStages";
+export const STAGE_LABELS: Record<CRMStageId, string> = {
+  por_contestar: 'stage:por_contestar',
+  pendiente_datos: 'stage:pendiente_datos',
+  por_confirmar: 'stage:por_confirmar',
+  pendiente_guia: 'stage:pendiente_guia',
+  pedido_completo: 'stage:pedido_completo',
+};
+
+export async function syncStageLabel(
+  conversationId: number | string,
+  stage: CRMStageId
+): Promise<void> {
+  const target = STAGE_LABELS[stage];
+  if (!target) return;
+  await addConversationLabels(conversationId, [target]).catch(() => false);
+  const all = Object.values(STAGE_LABELS);
+  const toRemove = all.filter((l) => l !== target);
+  await Promise.allSettled(toRemove.map((l) => deleteConversationLabel(conversationId, l)));
 }
 
 // ===== API: mensajes por conversación =====

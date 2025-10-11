@@ -14,6 +14,7 @@ import CRMRoute from "./pages/CRM";                 // CRM actual (tabla + tabs)
 import CRMInbox from "./pages/CRMInbox";            // 👈 NUEVO: inbox 3 paneles
 import Conversations from "./pages/Conversations";
 import Advertising from "./pages/Advertising";
+import AdvertisingV2 from "./pages/AdvertisingV2";
 import Sales from "./pages/Sales";                  // 👈 NUEVO: Ventas
 import Billing from "./pages/Billing";              // 👈 NUEVO: Facturación
 import Deliveries from "./pages/Deliveries";
@@ -88,7 +89,7 @@ const App: React.FC = () => {
                 path="/advertising"
                 element={
                   <ProtectedRoute>
-                    <Advertising />
+                    <AdvertisingV2 />
                   </ProtectedRoute>
                 }
               />
