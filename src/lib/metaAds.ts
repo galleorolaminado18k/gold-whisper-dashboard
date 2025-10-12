@@ -299,6 +299,7 @@ export async function fetchAllAccountsCampaigns(
 
         const insightsData = await insightsResponse.json();
         const insights = insightsData.data || [];
+        console.log(`📈 ${accountName}: ${insights.length} insights recibidos`);
         
         // Crear mapa de insights con tipo explícito
         const insightsMap = new Map<string, MetaInsights>(
@@ -308,6 +309,10 @@ export async function fetchAllAccountsCampaigns(
         // Combinar campañas con insights
         const campaignsWithInsights = campaigns.map((campaign: MetaCampaign) => {
           const campaignInsights = insightsMap.get(campaign.id);
+          
+          if (campaignInsights) {
+            console.log(`  📊 Campaña "${campaign.name}": spend=$${campaignInsights.spend}, clicks=${campaignInsights.clicks}`);
+          }
           
           return {
             ...campaign,

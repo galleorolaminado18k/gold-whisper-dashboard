@@ -186,9 +186,12 @@ const Advertising = () => {
   const loadRealData = async () => {
     setLoading(true);
     try {
+      console.log('🔄 Iniciando carga de datos desde Meta Ads...');
       const metaCampaigns = await fetchAllAccountsCampaigns(datePreset);
+      console.log(`📊 Campañas recibidas de Meta Ads:`, metaCampaigns?.length || 0);
       
       if (metaCampaigns && metaCampaigns.length > 0) {
+        console.log('✅ Datos de Meta Ads recibidos:', metaCampaigns);
         setOriginalMetaCampaigns(metaCampaigns); // Guardar originales
         const transformedCampaigns = metaCampaigns.map(transformMetaCampaign);
 
@@ -213,9 +216,11 @@ const Advertising = () => {
         const enriched = await Promise.all(
           withBudgets.map(async (c) => {
             try {
+              console.log(`🔍 Enriqueciendo campaña: ${c.nombre} (ID: ${c.id})`);
               const label = `campaign:${c.id}`;
               const convs = await fetchConversationsByLabel(label);
               let conversaciones = Array.isArray(convs) ? convs.length : 0;
+              console.log(`  💬 Conversaciones encontradas desde CRM: ${conversaciones}`);
 
               // Fallback: si no hay etiquetas aún, usa Meta 'actions' de mensajería como proxy
               if (conversaciones === 0) {
@@ -264,6 +269,7 @@ const Advertising = () => {
               try {
                 const db = await getTotalsByCampaignFromSupabase(c.id);
                 if (db && typeof db.ingresos === 'number' && db.ingresos > 0) ingresos = db.ingresos;
+                console.log(`  💰 Ingresos desde Supabase: ${ingresos}`);
               } catch (error) {
                 console.error(`Error fetching Supabase totals for campaign ${c.id}:`, error);
               }
@@ -273,6 +279,7 @@ const Advertising = () => {
               const roas = gastado > 0 ? ingresos / gastado : 0;
               const cvr = conversaciones > 0 ? (ventas / conversaciones) * 100 : 0; // CVR = Ventas / Conversaciones (según solicitud del usuario)
 
+              console.log(`  📊 Métricas finales - Gastado: $${gastado}, Conv: ${conversaciones}, Ventas: ${ventas}, Ingresos: $${ingresos}, ROAS: ${roas.toFixed(2)}x, CVR: ${cvr.toFixed(2)}%`);
               return { ...c, conversaciones, ventas, ingresos, costePorConv, roas, cvr } as CampaignData;
             } catch (error) {
               console.error(`Error enriching campaign ${c.id} with CRM/Supabase data:`, error);
