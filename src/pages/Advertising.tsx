@@ -178,6 +178,8 @@ const Advertising = () => {
   const [adsData, setAdsData] = useState<Map<string, MetaAd[]>>(new Map());
   const [loadingAdSets, setLoadingAdSets] = useState(false);
   const [loadingAds, setLoadingAds] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [, forceUpdate] = useState(0); // Para forzar re-render del contador de tiempo
 
   // Guardar campañas originales de Meta para poder actualizar su estado
   const [originalMetaCampaigns, setOriginalMetaCampaigns] = useState<MetaCampaign[]>([]);
@@ -290,6 +292,7 @@ const Advertising = () => {
 
         setCampaigns(enriched);
         setUsingRealData(true);
+        setLastUpdated(new Date());
         console.log(`✅ ${transformedCampaigns.length} campañas cargadas desde Meta Ads`);
       } else {
         console.warn("⚠️ No se encontraron campañas activas en Meta Ads");
@@ -317,10 +320,10 @@ const Advertising = () => {
   useEffect(() => {
     loadRealData();
     
-    // Auto-actualizar cada 60 segundos
+    // Auto-actualizar cada 30 segundos para datos en tiempo real
     const interval = setInterval(() => {
       loadRealData();
-    }, 60 * 1000); // 60 segundos
+    }, 30 * 1000); // 30 segundos
     
     return () => clearInterval(interval);
   }, []);
@@ -329,6 +332,17 @@ const Advertising = () => {
   useEffect(() => {
     loadRealData();
   }, [datePreset]);
+
+  // Actualizar el contador de "hace X segundos" cada segundo
+  useEffect(() => {
+    if (!lastUpdated) return;
+    
+    const timer = setInterval(() => {
+      forceUpdate(prev => prev + 1);
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [lastUpdated]);
 
   // Seleccionar/deseleccionar campaña
   const toggleCampaignSelection = (campaignId: string) => {
@@ -547,8 +561,15 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
         <div className="bg-white border-b px-6 py-3">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Administrador de anuncios</h1>
-              <p className="text-sm text-gray-500 mt-1">Gestiona tus campañas publicitarias</p>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-gray-900">Administrador de anuncios</h1>
+                {lastUpdated && (
+                  <span className="text-xs text-gray-400 font-normal">
+                    Actualizado hace {Math.floor((Date.now() - lastUpdated.getTime()) / 1000)}s
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 mt-1">Gestiona tus campañas publicitarias • Actualización automática cada 30 segundos</p>
             </div>
             <div className="flex items-center gap-2">
               <Select 
