@@ -35,6 +35,8 @@ export interface MetaCampaign {
     conversions: number;
     cost_per_conversion: number;
   };
+  account_name?: string; // Añadido para identificar la cuenta de la campaña
+  account_id?: string; // Añadido para identificar el ID de la cuenta de la campaña
 }
 
 export interface MetaInsights {
@@ -69,6 +71,13 @@ export interface MetaAdSet {
     cpm: number;
     ctr: number;
   };
+  // Añadidos para métricas de CRM/ventas a nivel AdSet
+  conversaciones?: number;
+  ventas?: number;
+  ingresos?: number;
+  roas?: number;
+  cvr?: number;
+  costePorConv?: number; // Añadido para métricas de CRM/ventas a nivel AdSet
 }
 
 /**
@@ -402,9 +411,16 @@ export async function fetchCampaignAdSets(
     const data = await response.json();
     const adSets = data.data || [];
 
-    // Obtener insights para cada ad set
-    const adSetsWithInsights = await Promise.all(
+    // Importar funciones de CRM y sales para enriquecer datos
+    const { fetchConversationsByLabel, fetchMessages } = await import('@/lib/chatwoot');
+    const { getTotalsByCampaignFromSupabase } = await import('@/lib/sales');
+    const { default: classifyStage } = await import('@/lib/classifier');
+    const { getCategoryLabelForMessages } = await import('@/lib/campaignAttribution');
+
+    // Obtener insights y enriquecer con datos de CRM/Supabase para cada ad set
+    const adSetsWithInsightsAndCRM = await Promise.all(
       adSets.map(async (adSet: MetaAdSet) => {
+        let enrichedAdSet: MetaAdSet = { ...adSet };
         try {
           const insightsUrl = `${META_API_BASE}/${adSet.id}/insights`;
           const insightsParams = new URLSearchParams({
@@ -419,29 +435,79 @@ export async function fetchCampaignAdSets(
             const insightsData = await insightsResponse.json();
             const insights = insightsData.data?.[0];
             
-            return {
-              ...adSet,
-              insights: insights ? {
-                spend: parseFloat(String(insights.spend)) || 0,
-                impressions: parseInt(String(insights.impressions)) || 0,
-                reach: parseInt(String(insights.reach)) || 0,
-                clicks: parseInt(String(insights.clicks)) || 0,
-                cpc: parseFloat(String(insights.cpc)) || 0,
-                cpm: parseFloat(String(insights.cpm)) || 0,
-                ctr: parseFloat(String(insights.ctr)) || 0,
-              } : undefined,
-            };
+            enrichedAdSet.insights = insights ? {
+              spend: parseFloat(String(insights.spend)) || 0,
+              impressions: parseInt(String(insights.impressions)) || 0,
+              reach: parseInt(String(insights.reach)) || 0,
+              clicks: parseInt(String(insights.clicks)) || 0,
+              cpc: parseFloat(String(insights.cpc)) || 0,
+              cpm: parseFloat(String(insights.cpm)) || 0,
+              ctr: parseFloat(String(insights.ctr)) || 0,
+            } : undefined;
           }
-          
-          return adSet;
         } catch (error) {
           console.error(`Error fetching insights for ad set ${adSet.id}:`, error);
-          return adSet;
         }
+
+        // Enriquecer con datos del CRM (conversaciones y ventas por ad set)
+        try {
+          const label = `adset:${adSet.id}`; // Asumiendo que las conversaciones pueden etiquetarse por adset
+          const convs = await fetchConversationsByLabel(label);
+          let conversaciones = Array.isArray(convs) ? convs.length : 0;
+
+          // Contar ventas (conversaciones en etapa 'pedido_completo') vía clasificador
+          let ventas = 0;
+          let ingresosEstimado = 0;
+          const AOV_DEFAULT = Number(import.meta.env.VITE_DEFAULT_AOV) || 285000;
+          const AOV_BAL = Number(import.meta.env.VITE_AOV_BALINERIA) || AOV_DEFAULT;
+          const AOV_JOY = Number(import.meta.env.VITE_AOV_JOYERIA) || AOV_DEFAULT;
+          for (const conv of convs) {
+            const msgs = await fetchMessages(conv.id).catch((error) => {
+              console.error(`Error fetching messages for conversation ${conv.id}:`, error);
+              return [];
+            });
+            const stage = classifyStage(msgs);
+            if (stage === "pedido_completo") {
+              ventas++;
+              const cat = getCategoryLabelForMessages(msgs);
+              if (cat === 'category:balineria') ingresosEstimado += AOV_BAL;
+              else if (cat === 'category:joyeria') ingresosEstimado += AOV_JOY;
+              else ingresosEstimado += AOV_DEFAULT;
+            }
+          }
+
+          // Intento de ingresos reales desde Supabase (si existe orders)
+          let ingresos = ingresosEstimado;
+          try {
+            const db = await getTotalsByCampaignFromSupabase(adSet.id); // Asumiendo que Supabase también puede filtrar por adset ID
+            if (db && typeof db.ingresos === 'number' && db.ingresos > 0) ingresos = db.ingresos;
+          } catch (error) {
+            console.error(`Error fetching Supabase totals for ad set ${adSet.id}:`, error);
+          }
+
+          const gastado = enrichedAdSet.insights?.spend || 0;
+          const costePorConv = conversaciones > 0 ? gastado / conversaciones : 0;
+          const roas = gastado > 0 ? ingresos / gastado : 0;
+          const cvr = ventas > 0 ? (conversaciones / ventas) * 100 : 0; // CVR = Conversaciones / Ventas (según solicitud del usuario)
+
+          enrichedAdSet = { 
+            ...enrichedAdSet, 
+            conversaciones, 
+            ventas, 
+            ingresos, 
+            roas, 
+            cvr,
+            costePorConv // Aunque no está en la interfaz MetaAdSet, se puede añadir para uso interno
+          };
+
+        } catch (error) {
+          console.error(`Error enriching ad set ${adSet.id} with CRM/Supabase data:`, error);
+        }
+        return enrichedAdSet;
       })
     );
 
-    return adSetsWithInsights;
+    return adSetsWithInsightsAndCRM;
   } catch (error) {
     console.error('Error en fetchCampaignAdSets:', error);
     return [];

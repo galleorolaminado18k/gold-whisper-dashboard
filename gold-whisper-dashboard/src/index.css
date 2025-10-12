@@ -1,0 +1,216 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================
+   Design system (todas las variables en HSL)
+   ========================================================= */
+@layer base {
+  :root {
+    /* Neutrales base */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    /* Marca original (oro) que ya usas en el dashboard */
+    --primary: 45 85% 55%;
+    --primary-foreground: 0 0% 10%;
+
+    --secondary: 45 75% 70%;
+    --secondary-foreground: 0 0% 10%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 45 85% 55%;
+    --accent-foreground: 0 0% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 45 85% 55%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 45 85% 55%;
+    --sidebar-primary-foreground: 0 0% 10%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 45 85% 55%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 45 85% 55%;
+
+    /* Charts */
+    --chart-1: 45 85% 55%;
+    --chart-2: 45 75% 70%;
+    --chart-3: 0 0% 20%;
+    --chart-4: 45 65% 45%;
+    --chart-5: 0 0% 60%;
+
+    /* Oro helper */
+    --gold: 45 85% 55%;
+    --gold-light: 45 75% 70%;
+    --gold-dark: 45 75% 45%;
+    --gradient-gold: linear-gradient(135deg, hsl(45 85% 55%), hsl(45 75% 70%));
+    --shadow-gold: 0 4px 20px hsl(45 85% 55% / 0.15);
+    --shadow-gold-lg: 0 10px 40px hsl(45 85% 55% / 0.2);
+
+    /* ====== Paleta estilo WhatsApp (para CRM Inbox) ====== */
+    --wa-green: 142 71% 45%;          /* #25D366 botón enviar */
+    --wa-green-dark: 173 77% 31%;     /* #128C7E header */
+    --wa-teal: 174 86% 20%;           /* #075E54 header oscuro */
+    --wa-blue: 217 91% 60%;           /* badges / estados activos */
+    --wa-muted: 210 8% 46%;           /* texto secundario #717171 */
+    --wa-chat-bg: 38 35% 92%;         /* #efeae2 fondo chat */
+    --wa-chat-dot: 26 20% 79%;        /* #d1c7bd puntitos */
+    
+    /* Sidebar/Panel izquierdo */
+    --wa-panel-bg: 0 0% 100%;         /* #ffffff fondo panel */
+    --wa-panel-header: 236 5% 96%;    /* #f0f2f5 header panel */
+    --wa-panel-hover: 0 0% 96%;       /* hover conversación */
+    --wa-panel-active: 232 15% 92%;   /* #e8e8e8 conversación activa */
+    --wa-divider: 0 0% 90%;           /* #dadada líneas divisorias */
+    
+    /* Burbujas */
+    --wa-bubble-in: 0 0% 100%;        /* #ffffff cliente */
+    --wa-bubble-out: 107 59% 89%;     /* #D9FDD3 nosotros */
+    --wa-bubble-text: 210 10% 13%;    /* #202C33 texto burbuja */
+    --wa-bubble-time: 0 0% 60%;       /* texto de hora */
+    
+    /* Header chat */
+    --wa-header-bg: 236 5% 96%;       /* #f0f2f5 */
+    --wa-header-text: 0 0% 20%;       /* texto header */
+    
+    /* Input */
+    --wa-input-bg: 0 0% 100%;         /* fondo input */
+    --wa-input-border: 0 0% 88%;      /* borde input */
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
+
+  /* Scrollbar sutil (webkit) */
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--ring));
+  }
+}
+
+/* =========================================================
+   Components & utilities extra para CRM Inbox
+   ========================================================= */
+@layer components {
+  /* Fondo tipo WhatsApp para el área de mensajes - más similar al original */
+  .whatsapp-bg {
+    background-color: #e5ddd5;
+    background-image: 
+      repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,.03) 10px, rgba(255,255,255,.03) 20px),
+      repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(255,255,255,.03) 10px, rgba(255,255,255,.03) 20px),
+      url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23bbb' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+  /* Alias que usa el componente (mantener ambos nombres) */
+  .whatsapp-wallpaper {
+    background-color: #e5ddd5;
+    background-image: 
+      repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,.03) 10px, rgba(255,255,255,.03) 20px),
+      repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(255,255,255,.03) 10px, rgba(255,255,255,.03) 20px),
+      url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23bbb' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  /* Burbujas (si prefieres clases en lugar de utilidades) */
+  .bubble-out {
+    background-color: hsl(var(--wa-bubble-out));
+    color: hsl(var(--wa-bubble-text));
+    border-top-right-radius: 0.25rem; /* esquinas tipo WhatsApp */
+  }
+  .bubble-in {
+    background-color: hsl(var(--wa-bubble-in));
+    color: hsl(var(--wa-bubble-text));
+    border-top-left-radius: 0.25rem;
+  }
+
+  /* Badge de no leídos */
+.badge-unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background-color: hsl(var(--wa-green));
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background-color: hsl(var(--wa-green));
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+  /* Indicador “escribiendo…” con tres puntos animados (opcional) */
+  .typing {
+    color: hsl(var(--wa-blue));
+    display: inline-flex;
+    gap: 2px;
+    align-items: center;
+  }
+  .typing-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: currentColor;
+    animation: typing-bounce 1s infinite ease-in-out;
+  }
+  .typing-dot:nth-child(2) { animation-delay: .15s; }
+  .typing-dot:nth-child(3) { animation-delay: .3s; }
+}
+
+@layer utilities {
+  /* Textos secundarios tipo WhatsApp */
+  .text-wa-muted { color: hsl(var(--wa-muted)); }
+
+  /* Usos rápidos de color */
+  .bg-wa-green { background-color: hsl(var(--wa-green)); }
+  .bg-wa-out { background-color: hsl(var(--wa-bubble-out)); }
+  .bg-wa-in { background-color: hsl(var(--wa-bubble-in)); }
+}
+
+/* Animaciones */
+@keyframes typing-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: .6; }
+  40% { transform: translateY(-3px); opacity: 1; }
+}

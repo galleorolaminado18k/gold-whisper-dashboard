@@ -110,12 +110,14 @@ function transformMetaCampaign(metaCampaign: MetaCampaign): CampaignData {
   
   // Estimaciones basadas en datos reales
   // En producción, estas ventas e ingresos vendrían de eventos de conversión personalizados
-  const conversaciones = clicks;
+  // Estimaciones iniciales (se enriquecerán con datos de CRM y Supabase)
+  // Se inicializan a 0 o valores de Meta para asegurar que siempre haya un número
+  const conversaciones = insights?.clicks || 0; // Usar clicks como proxy inicial para conversaciones
+  const ventas = 0; // Se calculará con CRM
+  const ingresos = 0; // Se calculará con CRM/Supabase
   const costePorConv = conversaciones > 0 ? gastado / conversaciones : 0;
-  const ventas = Math.round(conversaciones * 0.22); // 22% tasa de conversión estimada
-  const ingresos = ventas * 28500; // Ticket promedio $28,500
   const roas = gastado > 0 ? (ingresos / gastado) : 0;
-  const cvr = conversaciones > 0 ? (ventas / conversaciones) * 100 : 0;
+  const cvr = conversaciones > 0 ? (ventas / conversaciones) * 100 : 0; // CVR = Ventas / Conversaciones (según solicitud del usuario)
 
   // IMPORTANTE: Usar effective_status que indica el estado REAL de entrega
   // effective_status = "ACTIVE" significa que la campaña está entregando anuncios realmente
@@ -153,11 +155,11 @@ function transformMetaCampaign(metaCampaign: MetaCampaign): CampaignData {
 
 // Datos de ejemplo SOLO para fallback si la API falla
 const mockCampaigns: CampaignData[] = [
-  { id: "1", nombre: "Black Friday 2024 - Balinería Premium", estado: "activa", entrega: "activa", recomendaciones: 4, presupuesto: 50000, gastado: 38750, conversaciones: 450, costePorConv: 86, ventas: 127, ingresos: 3850000, roas: 99.35, alcance: 125000, impresiones: 485000, cvr: 28.2, cpc: 95 },
-  { id: "2", nombre: "Campaña Día de la Madre - Joyería", estado: "pausada", entrega: "pausada", recomendaciones: 0, presupuesto: 35000, gastado: 28400, conversaciones: 320, costePorConv: 89, ventas: 85, ingresos: 2340000, roas: 82.39, alcance: 89000, impresiones: 342000, cvr: 26.6, cpc: 83 },
-  { id: "3", nombre: "San Valentín - Conversión WhatsApp", estado: "finalizada", entrega: "completada", recomendaciones: 0, presupuesto: 60000, gastado: 60000, conversaciones: 580, costePorConv: 103, ventas: 195, ingresos: 5670000, roas: 94.50, alcance: 156000, impresiones: 628000, cvr: 33.6, cpc: 96 },
-  { id: "4", nombre: "Tráfico Web - Catálogo Balines", estado: "activa", entrega: "activa", recomendaciones: 2, presupuesto: 25000, gastado: 18200, conversaciones: 234, costePorConv: 78, ventas: 52, ingresos: 1450000, roas: 79.67, alcance: 78000, impresiones: 295000, cvr: 22.2, cpc: 62 },
-  { id: "5", nombre: "Remarketing Carritos Abandonados", estado: "activa", entrega: "activa", recomendaciones: 1, presupuesto: 15000, gastado: 12300, conversaciones: 145, costePorConv: 85, ventas: 48, ingresos: 1280000, roas: 104.07, alcance: 45000, impresiones: 178000, cvr: 33.1, cpc: 69 },
+  { id: "1", nombre: "Black Friday 2024 - Balinería Premium", estado: "activa", entrega: "activa", recomendaciones: 4, presupuesto: 50000, gastado: 38750, conversaciones: 450, costePorConv: 86.11, ventas: 127, ingresos: 3850000, roas: 99.35, alcance: 125000, impresiones: 485000, cvr: (127 / 450) * 100, cpc: 95 },
+  { id: "2", nombre: "Campaña Día de la Madre - Joyería", estado: "pausada", entrega: "pausada", recomendaciones: 0, presupuesto: 35000, gastado: 28400, conversaciones: 320, costePorConv: 88.75, ventas: 85, ingresos: 2340000, roas: 82.39, alcance: 89000, impresiones: 342000, cvr: (85 / 320) * 100, cpc: 83 },
+  { id: "3", nombre: "San Valentín - Conversión WhatsApp", estado: "finalizada", entrega: "completada", recomendaciones: 0, presupuesto: 60000, gastado: 60000, conversaciones: 580, costePorConv: 103.45, ventas: 195, ingresos: 5670000, roas: 94.50, alcance: 156000, impresiones: 628000, cvr: (195 / 580) * 100, cpc: 96 },
+  { id: "4", nombre: "Tráfico Web - Catálogo Balines", estado: "activa", entrega: "activa", recomendaciones: 2, presupuesto: 25000, gastado: 18200, conversaciones: 234, costePorConv: 77.78, ventas: 52, ingresos: 1450000, roas: 79.67, alcance: 78000, impresiones: 295000, cvr: (52 / 234) * 100, cpc: 62 },
+  { id: "5", nombre: "Remarketing Carritos Abandonados", estado: "activa", entrega: "activa", recomendaciones: 1, presupuesto: 15000, gastado: 12300, conversaciones: 145, costePorConv: 84.83, ventas: 48, ingresos: 1280000, roas: 104.07, alcance: 45000, impresiones: 178000, cvr: (48 / 145) * 100, cpc: 69 },
 ];
 
 const Advertising = () => {
@@ -197,10 +199,11 @@ const Advertising = () => {
             if (c.presupuesto && c.presupuesto > 0) return c;
             try {
               const sets = await fetchCampaignAdSets(c.id, datePreset);
-              const sum = (sets || []).reduce((acc, s) => acc + (Number((s as any)?.daily_budget) || 0), 0);
+              const sum = (sets || []).reduce((acc, s) => acc + (Number(s?.daily_budget) || 0), 0);
               const budget = sum > 0 ? sum / 100 : 0;
               return { ...c, presupuesto: budget } as CampaignData;
-            } catch {
+            } catch (error) {
+              console.error(`Error fetching ad sets for campaign ${c.id}:`, error);
               return c;
             }
           })
@@ -217,16 +220,21 @@ const Advertising = () => {
               // Fallback: si no hay etiquetas aún, usa Meta 'actions' de mensajería como proxy
               if (conversaciones === 0) {
                 try {
-                  const convData = await fetchCampaignConversions(c.id, datePreset).catch(() => null);
+                  const convData = await fetchCampaignConversions(c.id, datePreset).catch((error) => {
+                    console.error(`Error fetching conversions for campaign ${c.id}:`, error);
+                    return null;
+                  });
                   const actions: Array<{ action_type?: string; value?: string | number }> =
-                    (convData && (convData as any).actions) || [];
+                    (convData && (convData.actions as Array<{ action_type?: string; value?: string | number }>)) || [];
                   const msgAction = (actions || []).find(
                     (a) => typeof a?.action_type === 'string' && String(a.action_type).includes('messaging')
                   );
                   const v = msgAction && (msgAction.value as string | number);
                   const n = Number(v);
                   if (Number.isFinite(n)) conversaciones = n;
-                } catch {}
+                } catch (error) {
+                  console.error(`Error in fallback for conversations for campaign ${c.id}:`, error);
+                }
               }
 
               // Contar ventas (conversaciones en etapa 'pedido_completo') vía clasificador
@@ -237,19 +245,14 @@ const Advertising = () => {
               const AOV_BAL = Number(import.meta.env.VITE_AOV_BALINERIA) || AOV_DEFAULT;
               const AOV_JOY = Number(import.meta.env.VITE_AOV_JOYERIA) || AOV_DEFAULT;
               for (const conv of convs) {
-                const msgs = await fetchMessages(conv.id).catch(() => []);
-                const stage = classifyStage(
-                  (Array.isArray(msgs) ? msgs : []) as unknown as {
-                    content?: string;
-                    message_type?: "incoming" | "outgoing" | number;
-                    created_at?: number;
-                  }[]
-                );
+                const msgs = await fetchMessages(conv.id).catch((error) => {
+                  console.error(`Error fetching messages for conversation ${conv.id}:`, error);
+                  return [];
+                });
+                const stage = classifyStage(msgs);
                 if (stage === "pedido_completo") {
                   ventas++;
-                  const cat = getCategoryLabelForMessages(
-                    (Array.isArray(msgs) ? msgs : []) as any
-                  );
+                  const cat = getCategoryLabelForMessages(msgs);
                   if (cat === 'category:balineria') ingresosEstimado += AOV_BAL;
                   else if (cat === 'category:joyeria') ingresosEstimado += AOV_JOY;
                   else ingresosEstimado += AOV_DEFAULT;
@@ -261,15 +264,18 @@ const Advertising = () => {
               try {
                 const db = await getTotalsByCampaignFromSupabase(c.id);
                 if (db && typeof db.ingresos === 'number' && db.ingresos > 0) ingresos = db.ingresos;
-              } catch {}
+              } catch (error) {
+                console.error(`Error fetching Supabase totals for campaign ${c.id}:`, error);
+              }
 
               const gastado = c.gastado || 0;
               const costePorConv = conversaciones > 0 ? gastado / conversaciones : 0;
               const roas = gastado > 0 ? ingresos / gastado : 0;
-              const cvr = conversaciones > 0 ? (ventas / conversaciones) * 100 : 0;
+              const cvr = conversaciones > 0 ? (ventas / conversaciones) * 100 : 0; // CVR = Ventas / Conversaciones (según solicitud del usuario)
 
               return { ...c, conversaciones, ventas, ingresos, costePorConv, roas, cvr } as CampaignData;
-            } catch {
+            } catch (error) {
+              console.error(`Error enriching campaign ${c.id} with CRM/Supabase data:`, error);
               return c;
             }
           })
@@ -304,10 +310,10 @@ const Advertising = () => {
   useEffect(() => {
     loadRealData();
     
-    // Auto-actualizar cada 5 minutos
+    // Auto-actualizar cada 60 segundos
     const interval = setInterval(() => {
       loadRealData();
-    }, 5 * 60 * 1000); // 5 minutos
+    }, 60 * 1000); // 60 segundos
     
     return () => clearInterval(interval);
   }, []);
@@ -385,7 +391,14 @@ const Advertising = () => {
     const ro = new (window as any).ResizeObserver(update);
     ro.observe(el);
     window.addEventListener('resize', update);
-    return () => { try { ro.disconnect(); } catch {} window.removeEventListener('resize', update); };
+    return () => { 
+      try { 
+        ro.disconnect(); 
+      } catch (error) {
+        console.error("Error disconnecting ResizeObserver:", error);
+      } 
+      window.removeEventListener('resize', update); 
+    };
   }, []);
 
   const handleMainScroll = () => {
@@ -466,7 +479,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
   const promedios = {
     costePorConv: totales.conversaciones > 0 ? totales.gastado / totales.conversaciones : 0,
     roas: totales.gastado > 0 ? totales.ingresos / totales.gastado : 0,
-    tasaConversion: totales.conversaciones > 0 ? (totales.ventas / totales.conversaciones) * 100 : 0,
+    tasaConversion: totales.conversaciones > 0 ? (totales.ventas / totales.conversaciones) * 100 : 0, // CVR = Ventas / Conversaciones (según solicitud del usuario)
   };
 
   // Función para ordenar
@@ -651,7 +664,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
 
             <Card className="border-l-4 border-l-indigo-500">
               <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase font-medium">CVR PROMEDIO</p>
+                <p className="text-xs text-gray-500 uppercase font-medium">TASA DE CONVERSION "CVR"</p>
                 <p className="text-2xl font-bold mt-1">{promedios.tasaConversion.toFixed(2)}%</p>
                 <p className="text-xs text-gray-500 mt-1">
                   {totales.conversaciones.toLocaleString()} conversaciones
@@ -1019,16 +1032,27 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                           <p className="font-semibold">${(adSet.insights?.spend || 0).toLocaleString()}</p>
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          {adSet.insights?.clicks || 0}
+                          {adSet.conversaciones?.toLocaleString() || '0'}
                         </TableCell>
                         <TableCell className="text-right text-gray-600">
-                          ${adSet.insights?.cpc ? adSet.insights.cpc.toFixed(2) : '0'}
+                          ${adSet.costePorConv?.toFixed(2) || '0'}
                         </TableCell>
-                        <TableCell className="text-right">—</TableCell>
-                        <TableCell className="text-right">—</TableCell>
-                        <TableCell className="text-right">—</TableCell>
                         <TableCell className="text-right">
-                          <span className="text-sm font-medium">{adSet.insights?.ctr ? adSet.insights.ctr.toFixed(2) : '0'}%</span>
+                          <p className="font-semibold text-green-600">{adSet.ventas || '0'}</p>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-green-600">
+                          ${((adSet.ingresos || 0) / 1000).toFixed(0)}K
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className={`font-bold text-lg ${
+                            (adSet.roas || 0) >= 4 ? 'text-green-600' :
+                            (adSet.roas || 0) >= 2 ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
+                            {(adSet.roas || 0).toFixed(2)}x
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="text-sm font-medium">{(adSet.cvr || 0).toFixed(2)}%</span>
                         </TableCell>
                       </TableRow>
                     ))

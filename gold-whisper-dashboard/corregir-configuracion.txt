@@ -1,0 +1,78 @@
+## INSTRUCCIONES PARA COPIAR Y PEGAR EN EL SERVIDOR
+
+# 1. Crear copia de seguridad de las configuraciones existentes
+cp /etc/nginx/sites-available/gold-whisper.conf /etc/nginx/sites-available/gold-whisper.conf.backup
+cp /etc/nginx/sites-available/n8n /etc/nginx/sites-available/n8n.backup 2>/dev/null
+
+# 2. Eliminar los enlaces simbólicos actuales (si existen)
+rm /etc/nginx/sites-enabled/gold-whisper.conf 2>/dev/null
+rm /etc/nginx/sites-enabled/n8n 2>/dev/null
+
+# 3. Crear nueva configuración para gold-whisper.conf
+cat > /etc/nginx/sites-available/gold-whisper.conf << "EOF"
+# Configuración para el dashboard (corregida)
+server {
+    listen 80;
+    server_name dashboard.galle18k.com;
+    
+    location / {
+        # Redireccionar al puerto 8081 (Gold Whisper Dashboard)
+        proxy_pass http://localhost:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+# Configuración para la API
+server {
+    listen 80;
+    server_name api.galle18k.com;
+    
+    location / {
+        # Redireccionar al puerto 3001 (API de Gold Whisper)
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+# Configuración para Chatwoot
+server {
+    listen 80;
+    server_name chatwoot.galle18k.com;
+    
+    location / {
+        # Redireccionar al puerto 3020 (Chatwoot)
+        proxy_pass http://localhost:3020;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+EOF
+
+# 4. Crear enlace simbólico para activar la configuración
+ln -sf /etc/nginx/sites-available/gold-whisper.conf /etc/nginx/sites-enabled/
+
+# 5. Verificar que la configuración de Nginx es válida
+nginx -t
+
+# 6. Reiniciar Nginx
+systemctl restart nginx
+
+# 7. Verificar el estado de Nginx
+systemctl status nginx
+
+# 8. Verificar qué aplicaciones están corriendo en los puertos
+ss -tulpn | grep -E ':(80|8081|3001|3020|5678)'
+
+# 9. Mostrar los registros de Nginx para depuración
+tail -n 50 /var/log/nginx/error.log

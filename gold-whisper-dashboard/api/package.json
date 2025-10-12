@@ -1,0 +1,22 @@
+{
+  "name": "chatwoot-api-bridge",
+  "version": "1.0.0",
+  "description": "API Bridge between Dashboard and Chatwoot",
+  "type": "module",
+  "main": "chatwoot.js",
+  "scripts": {
+    "start": "node chatwoot.js",
+    "dev": "node chatwoot.js"
+  },
+  "keywords": ["chatwoot", "api", "bridge"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
