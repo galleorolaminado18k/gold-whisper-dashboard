@@ -2,6 +2,8 @@
 // Clasificador por etapas basado en tu Prompt Maestro (Karla – Galle).
 // Exporta SOLO 'classifyStage' y tipos; nada llamado CRMView/CRMPage.
 
+import { isClaudeConfigured, classifyConversationWithClaude } from './claude';
+
 export type CWMessage = {
   id?: number | string;
   content?: string;
@@ -130,6 +132,31 @@ export function classifyStage(messages: CWMessage[] = []): CRMStageId {
   if (isIncomingType(last?.message_type)) return "por_contestar";
 
   return "por_contestar";
+}
+
+/** Clasifica una conversación usando Claude AI (async version) */
+export async function classifyStageWithAI(messages: CWMessage[] = []): Promise<CRMStageId> {
+  // If Claude is not configured, fall back to rule-based classification
+  if (!isClaudeConfigured()) {
+    return classifyStage(messages);
+  }
+
+  try {
+    // Extract message contents for Claude
+    const messageTexts = messages.map((m) => m?.content ?? "").filter(Boolean);
+    
+    if (messageTexts.length === 0) {
+      return "por_contestar";
+    }
+
+    // Call Claude API for classification
+    const result = await classifyConversationWithClaude(messageTexts);
+    return result as CRMStageId;
+  } catch (error) {
+    console.error('Error using Claude for classification, falling back to rule-based:', error);
+    // Fall back to rule-based classification on error
+    return classifyStage(messages);
+  }
 }
 
 export default classifyStage;
