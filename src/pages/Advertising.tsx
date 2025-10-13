@@ -288,10 +288,10 @@ const Advertising = () => {
   useEffect(() => {
     loadRealData();
     
-    // Auto-actualizar cada 5 minutos
+    // Auto-actualizar cada 30 segundos
     const interval = setInterval(() => {
       loadRealData();
-    }, 5 * 60 * 1000); // 5 minutos
+    }, 30000); // 30 segundos
     
     return () => clearInterval(interval);
   }, []);
