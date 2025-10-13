@@ -635,7 +635,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
 
             <Card className="border-l-4 border-l-indigo-500">
               <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase font-medium">CTR Promedio</p>
+                <p className="text-xs text-gray-500 uppercase font-medium">CVR Promedio</p>
                 <p className="text-2xl font-bold mt-1">{promedios.ctr}%</p>
                 <p className="text-xs text-gray-500 mt-1">
                   {totales.impresiones.toLocaleString()} impresiones
@@ -1101,7 +1101,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
             {loading && campaniasFiltradas.length === 0 && (
               <div className="text-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
-                <p className="text-gray-700 font-medium">Cargando campañas desde Meta Ads...</p>
+                <p className="text-gray-700 font-medium">Cargando campaï¿½as desde Meta Ads...</p>
                 <p className="text-gray-500 text-sm mt-2">
                   Conectando con {getAdAccounts().length} cuentas publicitarias
                 </p>
