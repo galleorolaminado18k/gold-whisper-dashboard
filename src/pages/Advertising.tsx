@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useLayoutEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -61,14 +61,9 @@ import {
   updateCampaignStatus, 
   updateAdSetStatus,
   fetchCampaignAdSets,
-  getAdAccounts, 
-  fetchCampaignConversions
+  getAdAccounts 
 } from "@/lib/metaAds";
 import { toast } from "sonner";
-import { fetchConversationsByLabel, fetchMessages } from "@/lib/chatwoot";
-import classifyStage from "@/lib/classifier";
-import { getCategoryLabelForMessages } from "@/lib/campaignAttribution";
-import { getTotalsByCampaignFromSupabase } from "@/lib/sales";
 
 interface MetaAd {
   id: string;
@@ -92,15 +87,11 @@ interface CampaignData {
   roas: number;
   alcance: number;
   impresiones: number;
-  cvr: number;
+  ctr: number;
   cpc: number;
   account_name?: string;
 }
 
-
-// Limite de caracteres visibles para nombres largos en tabla
-const NAME_MAX = 28;
-const clampName = (s: string) => (s && s.length > NAME_MAX ? s.slice(0, NAME_MAX) + "..." : s);
 // Función para transformar datos de Meta a formato de vista
 function transformMetaCampaign(metaCampaign: MetaCampaign): CampaignData {
   const insights = metaCampaign.insights;
@@ -110,56 +101,129 @@ function transformMetaCampaign(metaCampaign: MetaCampaign): CampaignData {
   
   // Estimaciones basadas en datos reales
   // En producción, estas ventas e ingresos vendrían de eventos de conversión personalizados
-  // Estimaciones iniciales (se enriquecerán con datos de CRM y Supabase)
-  // Se inicializan a 0 o valores de Meta para asegurar que siempre haya un número
-  const conversaciones = insights?.clicks || 0; // Usar clicks como proxy inicial para conversaciones
-  const ventas = 0; // Se calculará con CRM
-  const ingresos = 0; // Se calculará con CRM/Supabase
+  const conversaciones = clicks;
   const costePorConv = conversaciones > 0 ? gastado / conversaciones : 0;
+  const ventas = Math.round(conversaciones * 0.22); // 22% tasa de conversión estimada
+  const ingresos = ventas * 28500; // Ticket promedio $28,500
   const roas = gastado > 0 ? (ingresos / gastado) : 0;
-  const cvr = conversaciones > 0 ? (ventas / conversaciones) * 100 : 0; // CVR = Ventas / Conversaciones (según solicitud del usuario)
 
   // IMPORTANTE: Usar effective_status que indica el estado REAL de entrega
   // effective_status = "ACTIVE" significa que la campaña está entregando anuncios realmente
   // Si no es "ACTIVE", la campaña NO está entregando (pausada, completada por fecha, etc.)
   const isReallyActive = metaCampaign.effective_status === 'ACTIVE';
   
-  // Presupuesto: usa nivel campaña si existe; se ajustará luego con ad sets si falta
-  const budgetCampaign =
-    (typeof metaCampaign.daily_budget === 'number' && metaCampaign.daily_budget > 0
-      ? metaCampaign.daily_budget / 100
-      : (typeof metaCampaign.lifetime_budget === 'number' && metaCampaign.lifetime_budget > 0
-        ? metaCampaign.lifetime_budget / 100
-        : 0));
-
   return {
     id: metaCampaign.id,
     nombre: metaCampaign.name,
     estado: isReallyActive ? 'activa' : 'pausada', // Switch basado en entrega real
     entrega: isReallyActive ? 'activa' : 'pausada', // Entrega basada en estado real
     recomendaciones: 0,
-    presupuesto: budgetCampaign,
+    presupuesto: metaCampaign.daily_budget ? metaCampaign.daily_budget / 100 : (metaCampaign.lifetime_budget ? metaCampaign.lifetime_budget / 100 : 0),
     gastado,
     conversaciones,
     costePorConv,
     ventas,
     ingresos,
-    roas,
+    roas: roas * 100,
     alcance: insights?.reach || 0,
     impresiones,
-    cvr,
+    ctr: insights?.ctr || 0,
     cpc: insights?.cpc || 0,
-    account_name: metaCampaign.account_name,
   };
 }
 
 // Datos de ejemplo SOLO para fallback si la API falla
 const mockCampaigns: CampaignData[] = [
-  { id: "1", nombre: "Black Friday 2024 - Balinería Premium", estado: "activa", entrega: "activa", recomendaciones: 4, presupuesto: 50000, gastado: 38750, conversaciones: 450, costePorConv: 86.11, ventas: 127, ingresos: 3850000, roas: 99.35, alcance: 125000, impresiones: 485000, cvr: (127 / 450) * 100, cpc: 95 },
-  { id: "2", nombre: "Campaña Día de la Madre - Joyería", estado: "pausada", entrega: "pausada", recomendaciones: 0, presupuesto: 35000, gastado: 28400, conversaciones: 320, costePorConv: 88.75, ventas: 85, ingresos: 2340000, roas: 82.39, alcance: 89000, impresiones: 342000, cvr: (85 / 320) * 100, cpc: 83 },
-  { id: "3", nombre: "San Valentín - Conversión WhatsApp", estado: "finalizada", entrega: "completada", recomendaciones: 0, presupuesto: 60000, gastado: 60000, conversaciones: 580, costePorConv: 103.45, ventas: 195, ingresos: 5670000, roas: 94.50, alcance: 156000, impresiones: 628000, cvr: (195 / 580) * 100, cpc: 96 },
-  { id: "4", nombre: "Tráfico Web - Catálogo Balines", estado: "activa", entrega: "activa", recomendaciones: 2, presupuesto: 25000, gastado: 18200, conversaciones: 234, costePorConv: 77.78, ventas: 52, ingresos: 1450000, roas: 79.67, alcance: 78000, impresiones: 295000, cvr: (52 / 234) * 100, cpc: 62 },
-  { id: "5", nombre: "Remarketing Carritos Abandonados", estado: "activa", entrega: "activa", recomendaciones: 1, presupuesto: 15000, gastado: 12300, conversaciones: 145, costePorConv: 84.83, ventas: 48, ingresos: 1280000, roas: 104.07, alcance: 45000, impresiones: 178000, cvr: (48 / 145) * 100, cpc: 69 },
+  {
+    id: "1",
+    nombre: "Black Friday 2024 - Balinería Premium",
+    estado: "activa",
+    entrega: "activa",
+    recomendaciones: 4,
+    presupuesto: 50000,
+    gastado: 38750,
+    conversaciones: 450,
+    costePorConv: 86,
+    ventas: 127,
+    ingresos: 3850000,
+    roas: 99.35,
+    alcance: 125000,
+    impresiones: 485000,
+    ctr: 2.8,
+    cpc: 95
+  },
+  {
+    id: "2",
+    nombre: "Campaña Día de la Madre - Joyería",
+    estado: "pausada",
+    entrega: "pausada",
+    recomendaciones: 0,
+    presupuesto: 35000,
+    gastado: 28400,
+    conversaciones: 320,
+    costePorConv: 89,
+    ventas: 85,
+    ingresos: 2340000,
+    roas: 82.39,
+    alcance: 89000,
+    impresiones: 342000,
+    ctr: 2.4,
+    cpc: 83
+  },
+  {
+    id: "3",
+    nombre: "San Valentín - Conversión WhatsApp",
+    estado: "finalizada",
+    entrega: "completada",
+    recomendaciones: 0,
+    presupuesto: 60000,
+    gastado: 60000,
+    conversaciones: 580,
+    costePorConv: 103,
+    ventas: 195,
+    ingresos: 5670000,
+    roas: 94.50,
+    alcance: 156000,
+    impresiones: 628000,
+    ctr: 3.1,
+    cpc: 96
+  },
+  {
+    id: "4",
+    nombre: "Tráfico Web - Catálogo Balines",
+    estado: "activa",
+    entrega: "activa",
+    recomendaciones: 2,
+    presupuesto: 25000,
+    gastado: 18200,
+    conversaciones: 234,
+    costePorConv: 78,
+    ventas: 52,
+    ingresos: 1450000,
+    roas: 79.67,
+    alcance: 78000,
+    impresiones: 295000,
+    ctr: 2.1,
+    cpc: 62
+  },
+  {
+    id: "5",
+    nombre: "Remarketing Carritos Abandonados",
+    estado: "activa",
+    entrega: "activa",
+    recomendaciones: 1,
+    presupuesto: 15000,
+    gastado: 12300,
+    conversaciones: 145,
+    costePorConv: 85,
+    ventas: 48,
+    ingresos: 1280000,
+    roas: 104.07,
+    alcance: 45000,
+    impresiones: 178000,
+    ctr: 3.8,
+    cpc: 69
+  },
 ];
 
 const Advertising = () => {
@@ -178,8 +242,6 @@ const Advertising = () => {
   const [adsData, setAdsData] = useState<Map<string, MetaAd[]>>(new Map());
   const [loadingAdSets, setLoadingAdSets] = useState(false);
   const [loadingAds, setLoadingAds] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [, forceUpdate] = useState(0); // Para forzar re-render del contador de tiempo
 
   // Guardar campañas originales de Meta para poder actualizar su estado
   const [originalMetaCampaigns, setOriginalMetaCampaigns] = useState<MetaCampaign[]>([]);
@@ -188,111 +250,13 @@ const Advertising = () => {
   const loadRealData = async () => {
     setLoading(true);
     try {
-      console.log('🔄 Iniciando carga de datos desde Meta Ads...');
       const metaCampaigns = await fetchAllAccountsCampaigns(datePreset);
-      console.log(`📊 Campañas recibidas de Meta Ads:`, metaCampaigns?.length || 0);
       
       if (metaCampaigns && metaCampaigns.length > 0) {
-        console.log('✅ Datos de Meta Ads recibidos:', metaCampaigns);
         setOriginalMetaCampaigns(metaCampaigns); // Guardar originales
         const transformedCampaigns = metaCampaigns.map(transformMetaCampaign);
-
-        // Fallback de presupuesto: si la campaña no tiene presupuesto a nivel campaña,
-        // sumar daily_budget de sus ad sets.
-        const withBudgets = await Promise.all(
-          transformedCampaigns.map(async (c) => {
-            if (c.presupuesto && c.presupuesto > 0) return c;
-            try {
-              const sets = await fetchCampaignAdSets(c.id, datePreset);
-              const sum = (sets || []).reduce((acc, s) => acc + (Number(s?.daily_budget) || 0), 0);
-              const budget = sum > 0 ? sum / 100 : 0;
-              return { ...c, presupuesto: budget } as CampaignData;
-            } catch (error) {
-              console.error(`Error fetching ad sets for campaign ${c.id}:`, error);
-              return c;
-            }
-          })
-        );
-
-        // Enriquecer con datos del CRM (conversaciones y ventas por campaña) usando etiquetas
-        const enriched = await Promise.all(
-          withBudgets.map(async (c) => {
-            try {
-              console.log(`🔍 Enriqueciendo campaña: ${c.nombre} (ID: ${c.id})`);
-              const label = `campaign:${c.id}`;
-              const convs = await fetchConversationsByLabel(label);
-              let conversaciones = Array.isArray(convs) ? convs.length : 0;
-              console.log(`  💬 Conversaciones encontradas desde CRM: ${conversaciones}`);
-
-              // Fallback: si no hay etiquetas aún, usa Meta 'actions' de mensajería como proxy
-              if (conversaciones === 0) {
-                try {
-                  const convData = await fetchCampaignConversions(c.id, datePreset).catch((error) => {
-                    console.error(`Error fetching conversions for campaign ${c.id}:`, error);
-                    return null;
-                  });
-                  const actions: Array<{ action_type?: string; value?: string | number }> =
-                    (convData && (convData.actions as Array<{ action_type?: string; value?: string | number }>)) || [];
-                  const msgAction = (actions || []).find(
-                    (a) => typeof a?.action_type === 'string' && String(a.action_type).includes('messaging')
-                  );
-                  const v = msgAction && (msgAction.value as string | number);
-                  const n = Number(v);
-                  if (Number.isFinite(n)) conversaciones = n;
-                } catch (error) {
-                  console.error(`Error in fallback for conversations for campaign ${c.id}:`, error);
-                }
-              }
-
-              // Contar ventas (conversaciones en etapa 'pedido_completo') vía clasificador
-              // Contar ventas y estimar ingresos por categoría si no hay BD
-              let ventas = 0;
-              let ingresosEstimado = 0;
-              const AOV_DEFAULT = Number(import.meta.env.VITE_DEFAULT_AOV) || 285000;
-              const AOV_BAL = Number(import.meta.env.VITE_AOV_BALINERIA) || AOV_DEFAULT;
-              const AOV_JOY = Number(import.meta.env.VITE_AOV_JOYERIA) || AOV_DEFAULT;
-              for (const conv of convs) {
-                const msgs = await fetchMessages(conv.id).catch((error) => {
-                  console.error(`Error fetching messages for conversation ${conv.id}:`, error);
-                  return [];
-                });
-                const stage = classifyStage(msgs);
-                if (stage === "pedido_completo") {
-                  ventas++;
-                  const cat = getCategoryLabelForMessages(msgs);
-                  if (cat === 'category:balineria') ingresosEstimado += AOV_BAL;
-                  else if (cat === 'category:joyeria') ingresosEstimado += AOV_JOY;
-                  else ingresosEstimado += AOV_DEFAULT;
-                }
-              }
-
-              // Intento de ingresos reales desde Supabase (si existe orders)
-              let ingresos = ingresosEstimado;
-              try {
-                const db = await getTotalsByCampaignFromSupabase(c.id);
-                if (db && typeof db.ingresos === 'number' && db.ingresos > 0) ingresos = db.ingresos;
-                console.log(`  💰 Ingresos desde Supabase: ${ingresos}`);
-              } catch (error) {
-                console.error(`Error fetching Supabase totals for campaign ${c.id}:`, error);
-              }
-
-              const gastado = c.gastado || 0;
-              const costePorConv = conversaciones > 0 ? gastado / conversaciones : 0;
-              const roas = gastado > 0 ? ingresos / gastado : 0;
-              const cvr = conversaciones > 0 ? (ventas / conversaciones) * 100 : 0; // CVR = Ventas / Conversaciones (según solicitud del usuario)
-
-              console.log(`  📊 Métricas finales - Gastado: $${gastado}, Conv: ${conversaciones}, Ventas: ${ventas}, Ingresos: $${ingresos}, ROAS: ${roas.toFixed(2)}x, CVR: ${cvr.toFixed(2)}%`);
-              return { ...c, conversaciones, ventas, ingresos, costePorConv, roas, cvr } as CampaignData;
-            } catch (error) {
-              console.error(`Error enriching campaign ${c.id} with CRM/Supabase data:`, error);
-              return c;
-            }
-          })
-        );
-
-        setCampaigns(enriched);
+        setCampaigns(transformedCampaigns);
         setUsingRealData(true);
-        setLastUpdated(new Date());
         console.log(`✅ ${transformedCampaigns.length} campañas cargadas desde Meta Ads`);
       } else {
         console.warn("⚠️ No se encontraron campañas activas en Meta Ads");
@@ -320,7 +284,7 @@ const Advertising = () => {
   useEffect(() => {
     loadRealData();
     
-    // Auto-actualizar cada 30 segundos para datos en tiempo real
+    // Auto-actualizar cada 5 minutos
     const interval = setInterval(() => {
       loadRealData();
     }, 30 * 1000); // 30 segundos
@@ -332,17 +296,6 @@ const Advertising = () => {
   useEffect(() => {
     loadRealData();
   }, [datePreset]);
-
-  // Actualizar el contador de "hace X segundos" cada segundo
-  useEffect(() => {
-    if (!lastUpdated) return;
-    
-    const timer = setInterval(() => {
-      forceUpdate(prev => prev + 1);
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, [lastUpdated]);
 
   // Seleccionar/deseleccionar campaña
   const toggleCampaignSelection = (campaignId: string) => {
@@ -397,40 +350,7 @@ const Advertising = () => {
   );
 
   // Obtener anuncios de conjuntos seleccionados
-  
-  // Scroll sync: tabla y barra horizontal pegajosa
-  const tableScrollRef = useRef<HTMLDivElement>(null);
-  const topScrollRef = useRef<HTMLDivElement>(null);
-  const [contentWidth, setContentWidth] = useState<number>(2000);
-
-  useLayoutEffect(() => {
-    const el = tableScrollRef.current;
-    if (!el) return;
-    const update = () => setContentWidth(el.scrollWidth);
-    update();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ro = new (window as any).ResizeObserver(update);
-    ro.observe(el);
-    window.addEventListener('resize', update);
-    return () => { 
-      try { 
-        ro.disconnect(); 
-      } catch (error) {
-        console.error("Error disconnecting ResizeObserver:", error);
-      } 
-      window.removeEventListener('resize', update); 
-    };
-  }, []);
-
-  const handleMainScroll = () => {
-    const a = tableScrollRef.current, b = topScrollRef.current;
-    if (a && b && b.scrollLeft !== a.scrollLeft) b.scrollLeft = a.scrollLeft;
-  };
-  const handleTopScroll = () => {
-    const a = tableScrollRef.current, b = topScrollRef.current;
-    if (a && b && a.scrollLeft !== b.scrollLeft) a.scrollLeft = b.scrollLeft;
-  };
-const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
+  const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
     (adSetId) => adsData.get(adSetId) || []
   );
 
@@ -498,9 +418,10 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
   }), { gastado: 0, conversaciones: 0, ventas: 0, ingresos: 0, alcance: 0, impresiones: 0 });
 
   const promedios = {
-    costePorConv: totales.conversaciones > 0 ? totales.gastado / totales.conversaciones : 0,
-    roas: totales.gastado > 0 ? totales.ingresos / totales.gastado : 0,
-    tasaConversion: totales.conversaciones > 0 ? (totales.ventas / totales.conversaciones) * 100 : 0, // CVR = Ventas / Conversaciones (según solicitud del usuario)
+    costePorConv: totales.gastado / totales.conversaciones,
+    roas: (totales.ingresos / totales.gastado) * 100,
+    tasaConversion: (totales.ventas / totales.conversaciones) * 100,
+    ctr: ((totales.conversaciones / totales.impresiones) * 100).toFixed(2),
   };
 
   // Función para ordenar
@@ -558,18 +479,11 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
     <DashboardLayout>
       <div className="flex flex-col h-full">
         {/* Header Professional */}
-        <div className="bg-white border-b px-6 py-3">
-          <div className="flex items-center justify-between mb-2">
+        <div className="bg-white border-b px-6 py-4">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-gray-900">Administrador de anuncios</h1>
-                {lastUpdated && (
-                  <span className="text-xs text-gray-400 font-normal">
-                    Actualizado hace {Math.floor((Date.now() - lastUpdated.getTime()) / 1000)}s
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-gray-500 mt-1">Gestiona tus campañas publicitarias • Actualización automática cada 30 segundos</p>
+              <h1 className="text-2xl font-bold text-gray-900">Administrador de anuncios</h1>
+              <p className="text-sm text-gray-500 mt-1">Gestiona tus campañas publicitarias</p>
             </div>
             <div className="flex items-center gap-2">
               <Select 
@@ -616,7 +530,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
           </div>
 
           {/* Indicador de datos reales - SIEMPRE visible */}
-          <div className="mb-2 flex items-center gap-2 text-sm">
+          <div className="mb-3 flex items-center gap-2 text-sm">
             {loading ? (
               <>
                 <Badge variant="default" className="bg-blue-500">
@@ -683,7 +597,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
             <Card className="border-l-4 border-l-yellow-500">
               <CardContent className="p-4">
                 <p className="text-xs text-gray-500 uppercase font-medium">ROAS</p>
-                <p className="text-2xl font-bold mt-1">{promedios.roas.toFixed(2)}x</p>
+                <p className="text-2xl font-bold mt-1">{(promedios.roas / 100).toFixed(2)}x</p>
                 <p className="text-xs text-gray-500 mt-1">
                   ${totales.ingresos.toLocaleString()} ingresos
                 </p>
@@ -692,10 +606,10 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
 
             <Card className="border-l-4 border-l-indigo-500">
               <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase font-medium">TASA DE CONVERSION "CVR"</p>
-                <p className="text-2xl font-bold mt-1">{promedios.tasaConversion.toFixed(2)}%</p>
+                <p className="text-xs text-gray-500 uppercase font-medium">CTR Promedio</p>
+                <p className="text-2xl font-bold mt-1">{promedios.ctr}%</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {totales.conversaciones.toLocaleString()} conversaciones
+                  {totales.impresiones.toLocaleString()} impresiones
                 </p>
               </CardContent>
             </Card>
@@ -703,7 +617,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
         </div>
 
         {/* Barra de herramientas - Estilo Meta Ads */}
-        <div className="bg-white border-b px-6 py-2">
+        <div className="bg-gray-50 border-b px-6 py-3">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className="relative">
@@ -775,14 +689,9 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
         </div>
 
         {/* Tabla principal - Estilo profesional Meta */}
-        <div className="flex-1 bg-white relative" ref={tableScrollRef} style={{ overflowX: "auto", overflowY: "auto" }} onScroll={handleMainScroll}>
-            <div className="sticky top-0 left-0 w-full bg-white z-20">
-              <div ref={topScrollRef} className="overflow-x-auto overflow-y-hidden h-3" onScroll={handleTopScroll}>
-                <div style={{ width: contentWidth }} />
-              </div>
-            </div>
+        <div className="flex-1 bg-white relative" style={{ overflowX: 'scroll', overflowY: 'auto' }}>
           <Table className="w-full" style={{ minWidth: '2000px' }}>
-            <TableHeader className="sticky top-3 bg-gray-50 z-30 shadow-sm">
+            <TableHeader className="sticky top-0 bg-gray-50 z-10">
               <TableRow className="border-b-2">
                 <TableHead className="w-[50px]">
                   <input type="checkbox" className="rounded" />
@@ -880,13 +789,14 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                 </TableHead>
                 <TableHead className="text-right w-[60px]">
                   <button 
-                    onClick={() => handleSort('cvr')}
+                    onClick={() => handleSort('ctr')}
                     className="flex items-center gap-1 hover:text-blue-600 ml-auto text-xs"
                   >
-                    CVR
-                    <SortIcon field="cvr" />
+                    CTR
+                    <SortIcon field="ctr" />
                   </button>
                 </TableHead>
+                <TableHead className="w-[60px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -900,7 +810,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                       onChange={() => toggleCampaignSelection(campaign.id)}
                     />
                   </TableCell>
-                  <TableCell>
+                    <TableCell>
                     <Switch 
                       checked={campaign.estado === "activa"} 
                       onCheckedChange={() => handleToggleCampaign(campaign.id, campaign.estado)}
@@ -914,13 +824,21 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm truncate">{campaign.nombre}</p>
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <p className="font-medium text-sm whitespace-nowrap cursor-help" title={campaign.nombre}>{campaign.nombre}</p>
+                                <HelpCircle className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help shrink-0" />
                               </TooltipTrigger>
-                              <TooltipContent className="max-w-md">
-                                <p className="text-xs text-gray-700 break-words">{campaign.nombre}</p>
+                              <TooltipContent className="max-w-xs">
+                                <div className="space-y-2">
+                                  <p className="font-semibold">{campaign.nombre}</p>
+                                  <p className="text-xs text-gray-500">
+                                    Esta campaña publicitaria rastrea conversaciones generadas desde anuncios, 
+                                    mide el ROAS y conecta ventas con la inversión publicitaria para optimizar 
+                                    el rendimiento.
+                                  </p>
+                                </div>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -964,10 +882,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     <div>
                       <p className="font-semibold">${campaign.gastado.toLocaleString()}</p>
                       <p className="text-xs text-gray-500">
-                        {(() => {
-                          const pct = campaign.presupuesto > 0 ? (campaign.gastado / campaign.presupuesto) * 100 : 0;
-                          return Number.isFinite(pct) ? pct.toFixed(0) : '0';
-                        })()}%
+                        {((campaign.gastado / campaign.presupuesto) * 100).toFixed(0)}%
                       </p>
                     </div>
                   </TableCell>
@@ -978,21 +893,31 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     ${campaign.costePorConv.toLocaleString()}
                   </TableCell>
                   <TableCell className="text-right">
-                    <p className="font-semibold text-green-600">{campaign.ventas}</p>
+                    <div>
+                      <p className="font-semibold text-green-600">{campaign.ventas}</p>
+                      <p className="text-xs text-gray-500">
+                        {((campaign.ventas / campaign.conversaciones) * 100).toFixed(1)}%
+                      </p>
+                    </div>
                   </TableCell>
                   <TableCell className="text-right font-semibold text-green-600">
                     ${(campaign.ingresos / 1000).toFixed(0)}K
                   </TableCell>
                   <TableCell className="text-right">
                     <span className={`font-bold text-lg ${
-                      campaign.roas >= 4 ? 'text-green-600' :
-                      campaign.roas >= 2 ? 'text-yellow-600' : 'text-red-600'
+                      campaign.roas >= 90 ? 'text-green-600' :
+                      campaign.roas >= 70 ? 'text-yellow-600' : 'text-red-600'
                     }`}>
-                      {campaign.roas.toFixed(2)}x
+                      {(campaign.roas / 100).toFixed(2)}x
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <span className="text-sm font-medium">{campaign.cvr.toFixed(2)}%</span>
+                    <span className="text-sm font-medium">{campaign.ctr}%</span>
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -1038,19 +963,15 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                           <div className="flex items-center gap-2">
                             <Folder className="w-10 h-10 p-2 rounded-full bg-blue-100 text-blue-600" />
                             <div>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <p className="font-medium text-sm whitespace-nowrap cursor-help" title={adSet.name}>{adSet.name}</p>
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-md">
-                                    <p className="text-xs text-gray-700 break-words">{adSet.name}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                              <p className="text-xs text-gray-500">Conjunto de anuncios — ID: {adSet.id}</p>
+                              <p className="font-medium text-sm">{adSet.name}</p>
+                              <p className="text-xs text-gray-500">Conjunto de anuncios • ID: {adSet.id}</p>
                             </div>
                           </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={adSet.status === "ACTIVE" ? "default" : "secondary"} className={adSet.status === "ACTIVE" ? "bg-green-500" : ""}>
+                            {adSet.status === "ACTIVE" ? "Activa" : "Pausada"}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-center">—</TableCell>
                         <TableCell className="text-right font-medium">
@@ -1060,27 +981,21 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                           <p className="font-semibold">${(adSet.insights?.spend || 0).toLocaleString()}</p>
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          {adSet.conversaciones?.toLocaleString() || '0'}
+                          {adSet.insights?.clicks || 0}
                         </TableCell>
                         <TableCell className="text-right text-gray-600">
-                          ${adSet.costePorConv?.toFixed(2) || '0'}
+                          ${adSet.insights?.cpc ? adSet.insights.cpc.toFixed(2) : '0'}
                         </TableCell>
+                        <TableCell className="text-right">—</TableCell>
+                        <TableCell className="text-right">—</TableCell>
+                        <TableCell className="text-right">—</TableCell>
                         <TableCell className="text-right">
-                          <p className="font-semibold text-green-600">{adSet.ventas || '0'}</p>
+                          <span className="text-sm font-medium">{adSet.insights?.ctr ? adSet.insights.ctr.toFixed(2) : '0'}%</span>
                         </TableCell>
-                        <TableCell className="text-right font-semibold text-green-600">
-                          ${((adSet.ingresos || 0) / 1000).toFixed(0)}K
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className={`font-bold text-lg ${
-                            (adSet.roas || 0) >= 4 ? 'text-green-600' :
-                            (adSet.roas || 0) >= 2 ? 'text-yellow-600' : 'text-red-600'
-                          }`}>
-                            {(adSet.roas || 0).toFixed(2)}x
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className="text-sm font-medium">{(adSet.cvr || 0).toFixed(2)}%</span>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
@@ -1137,6 +1052,11 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                         <TableCell className="text-right">—</TableCell>
                         <TableCell className="text-right">—</TableCell>
                         <TableCell className="text-right">—</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -1144,15 +1064,16 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
               )}
             </TableBody>
           </Table>
-            {loading && campaniasFiltradas.length === 0 && (
-              <div className="text-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
-                <p className="text-gray-700 font-medium">Cargando campañas desde Meta Ads...</p>
-                <p className="text-gray-500 text-sm mt-2">
-                  Conectando con {getAdAccounts().length} cuentas publicitarias
-                </p>
-              </div>
-            )}
+
+          {loading && campaniasFiltradas.length === 0 && (
+            <div className="text-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
+              <p className="text-gray-700 font-medium">Cargando campañas desde Meta Ads...</p>
+              <p className="text-gray-500 text-sm mt-2">
+                Conectando con {getAdAccounts().length} cuentas publicitarias
+              </p>
+            </div>
+          )}
           
           {!loading && campaniasFiltradas.length === 0 && (
             <div className="text-center py-12">
@@ -1188,7 +1109,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
               </div>
               <div>
                 <span className="text-gray-500">ROAS promedio: </span>
-                <span className="font-bold text-green-600">{promedios.roas.toFixed(2)}x</span>
+                <span className="font-bold text-green-600">{(promedios.roas / 100).toFixed(2)}x</span>
               </div>
             </div>
           </div>
