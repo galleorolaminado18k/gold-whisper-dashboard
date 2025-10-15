@@ -99,12 +99,15 @@ function parseInsights(insights: any) {
   const spent = parseFloat(insights.spend || '0');
 
   const actions = insights.actions || [];
-  const conversationAction = actions.find(
-    (a: any) => 
-      a.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-      a.action_type === 'lead'
-  );
-  const conversations = conversationAction ? parseInt(conversationAction.value, 10) : 0;
+  // Conversaciones = "mensajes iniciados" (conversaciones iniciadas)
+  // Contabilizamos únicamente los action_type de conversación iniciada
+  const CONV_TYPES = new Set<string>([
+    'onsite_conversion.messaging_conversation_started_7d',
+    'onsite_conversion.messaging_conversation_started_7d_unique'
+  ]);
+  const conversations = actions
+    .filter((a: any) => a && CONV_TYPES.has(String(a.action_type)))
+    .reduce((sum: number, a: any) => sum + (parseInt(a.value, 10) || 0), 0);
 
   const actionValues = insights.action_values || [];
   const purchaseAction = actionValues.find(
