@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useLayoutEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -87,15 +87,12 @@ interface CampaignData {
   roas: number;
   alcance: number;
   impresiones: number;
+  cvr: number;
   ctr: number;
   cpc: number;
   account_name?: string;
 }
 
-
-// Limite de caracteres visibles para nombres largos en tabla
-const NAME_MAX = 28;
-const clampName = (s: string) => (s && s.length > NAME_MAX ? s.slice(0, NAME_MAX) + "..." : s);
 // Función para transformar datos de Meta a formato de vista
 function transformMetaCampaign(metaCampaign: MetaCampaign): CampaignData {
   const insights = metaCampaign.insights;
@@ -110,6 +107,9 @@ function transformMetaCampaign(metaCampaign: MetaCampaign): CampaignData {
   const ventas = Math.round(conversaciones * 0.22); // 22% tasa de conversión estimada
   const ingresos = ventas * 28500; // Ticket promedio $28,500
   const roas = gastado > 0 ? (ingresos / gastado) : 0;
+  
+  // CVR (Conversion Rate): ventas / conversaciones * 100
+  const cvr = conversaciones > 0 ? (ventas / conversaciones) * 100 : 0;
 
   // IMPORTANTE: Usar effective_status que indica el estado REAL de entrega
   // effective_status = "ACTIVE" significa que la campaña está entregando anuncios realmente
@@ -131,6 +131,7 @@ function transformMetaCampaign(metaCampaign: MetaCampaign): CampaignData {
     roas: roas * 100,
     alcance: insights?.reach || 0,
     impresiones,
+    cvr,
     ctr: insights?.ctr || 0,
     cpc: insights?.cpc || 0,
   };
@@ -153,6 +154,7 @@ const mockCampaigns: CampaignData[] = [
     roas: 99.35,
     alcance: 125000,
     impresiones: 485000,
+    cvr: 28.22,
     ctr: 2.8,
     cpc: 95
   },
@@ -171,6 +173,7 @@ const mockCampaigns: CampaignData[] = [
     roas: 82.39,
     alcance: 89000,
     impresiones: 342000,
+    cvr: 26.56,
     ctr: 2.4,
     cpc: 83
   },
@@ -189,6 +192,7 @@ const mockCampaigns: CampaignData[] = [
     roas: 94.50,
     alcance: 156000,
     impresiones: 628000,
+    cvr: 33.62,
     ctr: 3.1,
     cpc: 96
   },
@@ -207,6 +211,7 @@ const mockCampaigns: CampaignData[] = [
     roas: 79.67,
     alcance: 78000,
     impresiones: 295000,
+    cvr: 22.22,
     ctr: 2.1,
     cpc: 62
   },
@@ -225,6 +230,7 @@ const mockCampaigns: CampaignData[] = [
     roas: 104.07,
     alcance: 45000,
     impresiones: 178000,
+    cvr: 33.10,
     ctr: 3.8,
     cpc: 69
   },
@@ -259,9 +265,25 @@ const Advertising = () => {
       if (metaCampaigns && metaCampaigns.length > 0) {
         setOriginalMetaCampaigns(metaCampaigns); // Guardar originales
         const transformedCampaigns = metaCampaigns.map(transformMetaCampaign);
-        setCampaigns(transformedCampaigns);
+        
+        // Budget fallback: si una campaña tiene presupuesto = 0, sumar los presupuestos de sus Ad Sets
+        const withBudgets = await Promise.all(
+          transformedCampaigns.map(async (c) => {
+            if (c.presupuesto && c.presupuesto > 0) return c;
+            try {
+              const sets = await fetchCampaignAdSets(c.id, datePreset);
+              const sum = (sets || []).reduce((acc, s) => acc + (Number((s as any).daily_budget) || 0), 0);
+              const budget = sum > 0 ? sum / 100 : 0;
+              return { ...c, presupuesto: budget };
+            } catch {
+              return c;
+            }
+          })
+        );
+        
+        setCampaigns(withBudgets);
         setUsingRealData(true);
-        console.log(`✅ ${transformedCampaigns.length} campañas cargadas desde Meta Ads`);
+        console.log(`✅ ${withBudgets.length} campañas cargadas desde Meta Ads`);
       } else {
         console.warn("⚠️ No se encontraron campañas activas en Meta Ads");
         // Aún así marcar como datos reales, solo que vacío
@@ -288,10 +310,10 @@ const Advertising = () => {
   useEffect(() => {
     loadRealData();
     
-    // Auto-actualizar cada 5 minutos
+    // Auto-actualizar cada 30 segundos
     const interval = setInterval(() => {
       loadRealData();
-    }, 5 * 60 * 1000); // 5 minutos
+    }, 30 * 1000); // 30 segundos
     
     return () => clearInterval(interval);
   }, []);
@@ -354,32 +376,7 @@ const Advertising = () => {
   );
 
   // Obtener anuncios de conjuntos seleccionados
-  
-  // Scroll sync: tabla y barra horizontal pegajosa
-  const tableScrollRef = useRef<HTMLDivElement>(null);
-  const topScrollRef = useRef<HTMLDivElement>(null);
-  const [contentWidth, setContentWidth] = useState<number>(2000);
-
-  useLayoutEffect(() => {
-    const el = tableScrollRef.current;
-    if (!el) return;
-    const update = () => setContentWidth(el.scrollWidth);
-    update();
-    const ro = new (window as any).ResizeObserver(update);
-    ro.observe(el);
-    window.addEventListener('resize', update);
-    return () => { try { ro.disconnect(); } catch {} window.removeEventListener('resize', update); };
-  }, []);
-
-  const handleMainScroll = () => {
-    const a = tableScrollRef.current, b = topScrollRef.current;
-    if (a && b && b.scrollLeft !== a.scrollLeft) b.scrollLeft = a.scrollLeft;
-  };
-  const handleTopScroll = () => {
-    const a = tableScrollRef.current, b = topScrollRef.current;
-    if (a && b && a.scrollLeft !== b.scrollLeft) a.scrollLeft = b.scrollLeft;
-  };
-const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
+  const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
     (adSetId) => adsData.get(adSetId) || []
   );
 
@@ -508,8 +505,8 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
     <DashboardLayout>
       <div className="flex flex-col h-full">
         {/* Header Professional */}
-        <div className="bg-white border-b px-6 py-3">
-          <div className="flex items-center justify-between mb-2">
+        <div className="bg-white border-b px-6 py-4">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Administrador de anuncios</h1>
               <p className="text-sm text-gray-500 mt-1">Gestiona tus campañas publicitarias</p>
@@ -559,7 +556,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
           </div>
 
           {/* Indicador de datos reales - SIEMPRE visible */}
-          <div className="mb-2 flex items-center gap-2 text-sm">
+          <div className="mb-3 flex items-center gap-2 text-sm">
             {loading ? (
               <>
                 <Badge variant="default" className="bg-blue-500">
@@ -590,63 +587,37 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
             )}
           </div>
 
-          {/* Métricas principales - Estilo Meta */}
-          <div className="grid grid-cols-5 gap-4">
-            <Card className="border-l-4 border-l-blue-500">
-              <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase font-medium">Gasto total</p>
-                <p className="text-2xl font-bold mt-1">${totales.gastado.toLocaleString()}</p>
-                <p className="text-xs text-green-600 mt-1 flex items-center">
-                  <TrendingUp className="w-3 h-3 mr-1" />
-                  +12.3% vs anterior
-                </p>
-              </CardContent>
-            </Card>
+          {/* KPIs superiores (diseño anterior con CVR) */}
+          <div className="grid grid-cols-4 gap-4 mb-4">
+            <div className="bg-white rounded-lg border p-4">
+              <p className="text-xs text-gray-500 uppercase font-medium">Gasto Total</p>
+              <p className="text-2xl font-bold mt-1">${totales.gastado.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-lg border p-4">
+              <p className="text-xs text-gray-500 uppercase font-medium">Conversaciones</p>
+              <p className="text-2xl font-bold mt-1">{totales.conversaciones.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-lg border p-4">
+              <p className="text-xs text-gray-500 uppercase font-medium">Ventas</p>
+              <p className="text-2xl font-bold mt-1">{totales.ventas.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-lg border p-4">
+              <p className="text-xs text-gray-500 uppercase font-medium">CVR Promedio</p>
+              <p className="text-2xl font-bold mt-1">{promedios.tasaConversion.toFixed(2)}%</p>
+            </div>
+          </div>
 
-            <Card className="border-l-4 border-l-purple-500">
-              <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase font-medium">Conversaciones</p>
-                <p className="text-2xl font-bold mt-1">{totales.conversaciones.toLocaleString()}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  ${promedios.costePorConv.toFixed(2)} por conv.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-green-500">
-              <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase font-medium">Ventas</p>
-                <p className="text-2xl font-bold mt-1">{totales.ventas}</p>
-                <p className="text-xs text-green-600 mt-1">
-                  {promedios.tasaConversion.toFixed(1)}% tasa conversión
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-yellow-500">
-              <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase font-medium">ROAS</p>
-                <p className="text-2xl font-bold mt-1">{(promedios.roas / 100).toFixed(2)}x</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  ${totales.ingresos.toLocaleString()} ingresos
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-indigo-500">
-              <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase font-medium">CVR Promedio</p>
-                <p className="text-2xl font-bold mt-1">{promedios.ctr}%</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {totales.impresiones.toLocaleString()} impresiones
-                </p>
-              </CardContent>
-            </Card>
+          {/* Título + botón actualizar */}
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">Campañas</h2>
+            <button onClick={loadRealData} className="bg-yellow-400 hover:bg-yellow-500 text-black font-semibold px-3 py-1 rounded">
+              Actualizar
+            </button>
           </div>
         </div>
 
         {/* Barra de herramientas - Estilo Meta Ads */}
-        <div className="bg-white border-b px-6 py-2">
+        <div className="bg-gray-50 border-b px-6 py-3">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className="relative">
@@ -718,14 +689,9 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
         </div>
 
         {/* Tabla principal - Estilo profesional Meta */}
-        <div className="flex-1 bg-white relative" ref={tableScrollRef} style={{ overflowX: "auto", overflowY: "auto" }} onScroll={handleMainScroll}>
-            <div className="sticky top-0 left-0 w-full bg-white z-20">
-              <div ref={topScrollRef} className="overflow-x-auto overflow-y-hidden h-3" onScroll={handleTopScroll}>
-                <div style={{ width: contentWidth }} />
-              </div>
-            </div>
+        <div className="flex-1 bg-white relative" style={{ overflowX: 'scroll', overflowY: 'auto' }}>
           <Table className="w-full" style={{ minWidth: '2000px' }}>
-            <TableHeader className="sticky top-3 bg-gray-50 z-30 shadow-sm">
+            <TableHeader className="sticky top-0 bg-gray-50 z-10">
               <TableRow className="border-b-2">
                 <TableHead className="w-[50px]">
                   <input type="checkbox" className="rounded" />
@@ -823,11 +789,11 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                 </TableHead>
                 <TableHead className="text-right w-[60px]">
                   <button 
-                    onClick={() => handleSort('ctr')}
+                    onClick={() => handleSort('cvr')}
                     className="flex items-center gap-1 hover:text-blue-600 ml-auto text-xs"
                   >
-                    CTR
-                    <SortIcon field="ctr" />
+                    CVR
+                    <SortIcon field="cvr" />
                   </button>
                 </TableHead>
                 <TableHead className="w-[60px]"></TableHead>
@@ -858,7 +824,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm whitespace-nowrap" title={campaign.nombre}>{campaign.nombre}</p>
+                          <p className="font-medium text-sm truncate">{campaign.nombre}</p>
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -916,7 +882,10 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     <div>
                       <p className="font-semibold">${campaign.gastado.toLocaleString()}</p>
                       <p className="text-xs text-gray-500">
-                        {((campaign.gastado / campaign.presupuesto) * 100).toFixed(0)}%
+                        {(() => {
+                          const pct = campaign.presupuesto > 0 ? (campaign.gastado / campaign.presupuesto) * 100 : 0;
+                          return Number.isFinite(pct) ? pct.toFixed(0) : '0';
+                        })()}%
                       </p>
                     </div>
                   </TableCell>
@@ -946,7 +915,9 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <span className="text-sm font-medium">{campaign.ctr}%</span>
+                    <span className="text-sm font-medium">
+                      {campaign.cvr ? campaign.cvr.toFixed(2) : 0}%
+                    </span>
                   </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -997,7 +968,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                           <div className="flex items-center gap-2">
                             <Folder className="w-10 h-10 p-2 rounded-full bg-blue-100 text-blue-600" />
                             <div>
-                              <p className="font-medium text-sm whitespace-nowrap" title={adSet.name}>{adSet.name}</p>
+                              <p className="font-medium text-sm">{adSet.name}</p>
                               <p className="text-xs text-gray-500">Conjunto de anuncios • ID: {adSet.id}</p>
                             </div>
                           </div>
@@ -1098,15 +1069,16 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
               )}
             </TableBody>
           </Table>
-            {loading && campaniasFiltradas.length === 0 && (
-              <div className="text-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
-                <p className="text-gray-700 font-medium">Cargando campa�as desde Meta Ads...</p>
-                <p className="text-gray-500 text-sm mt-2">
-                  Conectando con {getAdAccounts().length} cuentas publicitarias
-                </p>
-              </div>
-            )}
+
+          {loading && campaniasFiltradas.length === 0 && (
+            <div className="text-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
+              <p className="text-gray-700 font-medium">Cargando campañas desde Meta Ads...</p>
+              <p className="text-gray-500 text-sm mt-2">
+                Conectando con {getAdAccounts().length} cuentas publicitarias
+              </p>
+            </div>
+          )}
           
           {!loading && campaniasFiltradas.length === 0 && (
             <div className="text-center py-12">
@@ -1153,8 +1125,3 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
 };
 
 export default Advertising;
-
-
-
-
-
