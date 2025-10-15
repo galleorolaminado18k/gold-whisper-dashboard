@@ -13,10 +13,8 @@ import Auth from "./pages/Auth";
 import CRMRoute from "./pages/CRM";                 // CRM actual (tabla + tabs)
 import CRMInbox from "./pages/CRMInbox";            // ðŸ‘ˆ NUEVO: inbox 3 paneles
 import Conversations from "./pages/Conversations";
-import Advertising from "./pages/Advertising";
-import AdvertisingV0 from "./pages/AdvertisingV0";
-import AdvertisingDashboard from "@src/client/pages/AdvertisingDashboard";
-import AIAnalytics from "./pages/AIAnalytics";      // ðŸ‘ˆ NUEVO: AnÃ¡lisis IA con Gemini
+import AdvertisingPage from "./pages";              // ðŸ'ˆ NUEVO: PÃ¡gina de v0 con diseÃ±o completo
+import AIAnalytics from "./pages/AIAnalytics";      // ðŸ'ˆ NUEVO: AnÃ¡lisis IA con Gemini
 import Sales from "./pages/Sales";                  // ðŸ‘ˆ NUEVO: Ventas
 import Billing from "./pages/Billing";              // ðŸ‘ˆ NUEVO: FacturaciÃ³n
 import Deliveries from "./pages/Deliveries";
@@ -91,7 +89,7 @@ const App: React.FC = () => {
                 path="/advertising"
                 element={
                   <ProtectedRoute>
-                    <AdvertisingDashboard />
+                    <AdvertisingPage />
                   </ProtectedRoute>
                 }
               />
