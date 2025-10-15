@@ -12,10 +12,10 @@ const ACCESS_TOKEN = import.meta.env.VITE_META_ACCESS_TOKEN || '';
 const ACCESS_TOKEN_2 = import.meta.env.VITE_META_ACCESS_TOKEN_2 || '';
 const AD_ACCOUNT_IDS = (import.meta.env.VITE_META_AD_ACCOUNT_IDS || '').split(',').map(id => id.trim());
 
-// Mapeo de cuenta a token (si hay tokens específicos por cuenta)
+// Mapeo de cuenta a token (ambas cuentas usan el mismo token)
 const ACCOUNT_TOKENS: Record<string, string> = {
-  '360084149294973': ACCESS_TOKEN_2 || ACCESS_TOKEN, // Token específico para orolaminado18kcucuta
-  '5518735214914409': ACCESS_TOKEN, // Token principal para GALLE 18K DETAL
+  '1281508182357459': ACCESS_TOKEN, // Cuenta 1 (ID corregido)
+  '5518735214914409': ACCESS_TOKEN, // GALLE 18K DETAL
 };
 
 // Función para obtener el token correcto según la cuenta
