@@ -149,8 +149,8 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
         const accountToken = getTokenForAccount(accountId);
         console.log(`📡 Consultando cuenta: act_${accountId} con token: ${accountToken.substring(0, 20)}...`);
         
-        // SIMPLIFICADO: Primero intentar sin insights anidados
-        const url = `${META_GRAPH_API_BASE}/act_${accountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget&access_token=${accountToken}`;
+        // OPTIMIZADO: Solo las últimas 5 campañas por cuenta (total 10 campañas)
+        const url = `${META_GRAPH_API_BASE}/act_${accountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget&limit=5&access_token=${accountToken}`;
         
         console.log(`🔗 URL: ${url.replace(accountToken, 'TOKEN_OCULTO')}`);
         
@@ -175,7 +175,7 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
         console.log(`📊 Respuesta de cuenta ${accountId}:`, JSON.stringify(data, null, 2));
         
         const campaigns = data.data || [];
-        console.log(`✅ ${campaigns.length} campañas encontradas en cuenta ${accountId}`);
+        console.log(`✅ ${campaigns.length} campañas encontradas en cuenta ${accountId} (máximo 5 por cuenta)`);
 
         if (campaigns.length === 0) {
           console.warn(`⚠️ No se encontraron campañas en la cuenta ${accountId}`);
@@ -313,8 +313,8 @@ export async function fetchMetaAdSets(campaignId?: string): Promise<AdSet[]> {
         // Obtener el token correcto para esta cuenta
         const accountToken = getTokenForAccount(accountId);
         
-        // OPTIMIZACIÓN: Solicitar insights como campo anidado
-        let url = `${META_GRAPH_API_BASE}/act_${accountId}/adsets?fields=id,name,status,campaign_id,daily_budget,lifetime_budget,insights{spend,actions,action_values}&limit=100&access_token=${accountToken}`;
+        // OPTIMIZACIÓN: Solicitar insights como campo anidado (límite 20 ad sets)
+        let url = `${META_GRAPH_API_BASE}/act_${accountId}/adsets?fields=id,name,status,campaign_id,daily_budget,lifetime_budget,insights{spend,actions,action_values}&limit=20&access_token=${accountToken}`;
         
         if (campaignId) {
           url += `&filtering=[{"field":"campaign.id","operator":"EQUAL","value":"${campaignId}"}]`;
@@ -397,8 +397,8 @@ export async function fetchMetaAds(adSetId?: string): Promise<Ad[]> {
         // Obtener el token correcto para esta cuenta
         const accountToken = getTokenForAccount(accountId);
         
-        // OPTIMIZACIÓN: Solicitar insights como campo anidado
-        let url = `${META_GRAPH_API_BASE}/act_${accountId}/ads?fields=id,name,status,adset_id,insights{spend,actions,action_values}&limit=100&access_token=${accountToken}`;
+        // OPTIMIZACIÓN: Solicitar insights como campo anidado (límite 30 ads)
+        let url = `${META_GRAPH_API_BASE}/act_${accountId}/ads?fields=id,name,status,adset_id,insights{spend,actions,action_values}&limit=30&access_token=${accountToken}`;
         
         if (adSetId) {
           url += `&filtering=[{"field":"adset.id","operator":"EQUAL","value":"${adSetId}"}]`;
