@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar, RefreshCw, Search, BarChart3, Download } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { fetchMetaCampaigns, fetchMetaAdSets, fetchMetaAds, type Campaign, type AdSet, type Ad } from "@/services/metaAdsService"
+import { fetchMetaCampaigns, fetchMetaAdSets, fetchMetaAds, clearCache, type Campaign, type AdSet, type Ad } from "@/services/metaAdsService"
 
 type TabType = "campaigns" | "adsets" | "ads"
 
@@ -59,14 +59,14 @@ export default function DashboardPage() {
     }
   }
 
-  // Cargar datos al montar y cada 30 segundos
+  // Cargar datos al montar y cada 2 minutos (usa cache si está disponible)
   useEffect(() => {
     loadMetaData()
     
     const interval = setInterval(() => {
-      setLastUpdate((prev) => prev + 30)
-      loadMetaData() // Recargar datos cada 30 segundos
-    }, 30000)
+      setLastUpdate((prev) => prev + 120) // Actualizar contador cada 2 minutos
+      loadMetaData() // Recargar datos (usará cache si es válido)
+    }, 120000) // 2 minutos
 
     return () => clearInterval(interval)
   }, [])
@@ -207,7 +207,16 @@ export default function DashboardPage() {
                 </SelectContent>
               </Select>
 
-              <Button variant="outline" size="icon" className="bg-white" onClick={() => setLastUpdate(0)}>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="bg-white" 
+                onClick={() => {
+                  setLastUpdate(0)
+                  clearCache() // Limpiar cache para forzar recarga
+                  loadMetaData() // Recargar inmediatamente
+                }}
+              >
                 <RefreshCw className="w-4 h-4" />
               </Button>
             </div>

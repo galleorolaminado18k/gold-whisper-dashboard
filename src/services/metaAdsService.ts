@@ -1,13 +1,32 @@
 /**
- * Meta Ads API Service
+ * Meta Ads API Service - OPTIMIZED VERSION
  * Fetches real campaign, ad set, and ad data from Meta Graph API v21.0
+ * with caching and batch requests for faster loading
  */
 
 const META_GRAPH_API_BASE = 'https://graph.facebook.com/v21.0';
+const CACHE_TTL = 2 * 60 * 1000; // 2 minutos de cache
 
 // Environment variables
 const ACCESS_TOKEN = import.meta.env.VITE_META_ACCESS_TOKEN || '';
 const AD_ACCOUNT_IDS = (import.meta.env.VITE_META_AD_ACCOUNT_IDS || '').split(',').map(id => id.trim());
+
+// Cache en memoria
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const cache = {
+  campaigns: null as CacheEntry<Campaign[]> | null,
+  adsets: null as CacheEntry<AdSet[]> | null,
+  ads: null as CacheEntry<Ad[]> | null,
+};
+
+function isCacheValid<T>(entry: CacheEntry<T> | null): boolean {
+  if (!entry) return false;
+  return Date.now() - entry.timestamp < CACHE_TTL;
+}
 
 export interface Campaign {
   id: string;
@@ -53,350 +72,282 @@ export interface Ad {
 }
 
 /**
- * Fetch campaigns with insights from all ad accounts
+ * Parse metrics from insights data
+ */
+function parseInsights(insights: any) {
+  const spent = parseFloat(insights.spend || '0');
+
+  const actions = insights.actions || [];
+  const conversationAction = actions.find(
+    (a: any) => 
+      a.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
+      a.action_type === 'lead'
+  );
+  const conversations = conversationAction ? parseInt(conversationAction.value, 10) : 0;
+
+  const actionValues = insights.action_values || [];
+  const purchaseAction = actionValues.find(
+    (a: any) => 
+      a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
+      a.action_type === 'omni_purchase'
+  );
+  const revenue = purchaseAction ? parseFloat(purchaseAction.value) : 0;
+
+  const salesAction = actions.find(
+    (a: any) => 
+      a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
+      a.action_type === 'omni_purchase'
+  );
+  const sales = salesAction ? parseInt(salesAction.value, 10) : 0;
+
+  const roas = spent > 0 ? revenue / spent : 0;
+  const cvr = conversations > 0 ? (sales / conversations) * 100 : 0;
+
+  return { spent, conversations, sales, revenue, roas, cvr };
+}
+
+/**
+ * Fetch campaigns with insights from all ad accounts - OPTIMIZED
+ * Uses insights as nested field to reduce API calls
  */
 export async function fetchMetaCampaigns(): Promise<Campaign[]> {
+  // Check cache first
+  if (isCacheValid(cache.campaigns)) {
+    console.log('✅ Usando campañas desde cache');
+    return cache.campaigns!.data;
+  }
+
   if (!ACCESS_TOKEN) {
     console.error('❌ META ACCESS TOKEN no configurado');
     return [];
   }
 
-  const allCampaigns: Campaign[] = [];
+  const startTime = Date.now();
+  console.log('🚀 Cargando campañas desde Meta API...');
 
-  for (const accountId of AD_ACCOUNT_IDS) {
-    if (!accountId) continue;
+  try {
+    // Paralelizar las llamadas a cada cuenta
+    const accountPromises = AD_ACCOUNT_IDS.filter(id => id).map(async (accountId) => {
+      try {
+        // OPTIMIZACIÓN: Solicitar insights como campo anidado en una sola llamada
+        const url = `${META_GRAPH_API_BASE}/act_${accountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget,insights{spend,actions,action_values}&limit=100&access_token=${ACCESS_TOKEN}`;
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          console.error(`Error en cuenta ${accountId}:`, response.status);
+          return [];
+        }
 
-    try {
-      console.log(`📊 Obteniendo campañas de cuenta: ${accountId}`);
+        const data = await response.json();
+        const campaigns = data.data || [];
 
-      // Fetch campaigns
-      const campaignsUrl = `${META_GRAPH_API_BASE}/act_${accountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget&access_token=${ACCESS_TOKEN}`;
-      const campaignsResponse = await fetch(campaignsUrl);
-      
-      if (!campaignsResponse.ok) {
-        console.error(`Error fetching campaigns for ${accountId}:`, await campaignsResponse.text());
-        continue;
-      }
+        return campaigns.map((campaign: any) => {
+          const insights = campaign.insights?.data?.[0] || {};
+          const metrics = parseInsights(insights);
 
-      const campaignsData = await campaignsResponse.json();
-      const campaigns = campaignsData.data || [];
-
-      // Fetch insights for each campaign
-      for (const campaign of campaigns) {
-        try {
-          const insightsUrl = `${META_GRAPH_API_BASE}/${campaign.id}/insights?fields=spend,actions,action_values&access_token=${ACCESS_TOKEN}`;
-          const insightsResponse = await fetch(insightsUrl);
-
-          if (!insightsResponse.ok) {
-            console.warn(`No insights for campaign ${campaign.id}`);
-            allCampaigns.push({
-              id: campaign.id,
-              name: campaign.name,
-              status: campaign.status,
-              objective: campaign.objective,
-              daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : undefined,
-              lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : undefined,
-              spent: 0,
-              conversations: 0,
-              sales: 0,
-              revenue: 0,
-              roas: 0,
-              cvr: 0,
-            });
-            continue;
-          }
-
-          const insightsData = await insightsResponse.json();
-          const insights = insightsData.data?.[0] || {};
-
-          // Parse spend
-          const spent = parseFloat(insights.spend || '0');
-
-          // Parse conversations from actions
-          const actions = insights.actions || [];
-          const conversationAction = actions.find(
-            (a: any) => 
-              a.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-              a.action_type === 'lead'
-          );
-          const conversations = conversationAction ? parseInt(conversationAction.value, 10) : 0;
-
-          // Parse sales and revenue from action_values
-          const actionValues = insights.action_values || [];
-          const purchaseAction = actionValues.find(
-            (a: any) => 
-              a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
-              a.action_type === 'omni_purchase'
-          );
-          const revenue = purchaseAction ? parseFloat(purchaseAction.value) : 0;
-
-          // Calculate sales (assuming we track purchase count in actions)
-          const salesAction = actions.find(
-            (a: any) => 
-              a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
-              a.action_type === 'omni_purchase'
-          );
-          const sales = salesAction ? parseInt(salesAction.value, 10) : 0;
-
-          // Calculate ROAS and CVR
-          const roas = spent > 0 ? revenue / spent : 0;
-          const cvr = conversations > 0 ? (sales / conversations) * 100 : 0;
-
-          allCampaigns.push({
+          return {
             id: campaign.id,
             name: campaign.name,
             status: campaign.status,
             objective: campaign.objective,
             daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : undefined,
             lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : undefined,
-            spent,
-            conversations,
-            sales,
-            revenue,
-            roas,
-            cvr,
-          });
-        } catch (error) {
-          console.error(`Error fetching insights for campaign ${campaign.id}:`, error);
-        }
+            ...metrics,
+          };
+        });
+      } catch (error) {
+        console.error(`Error en cuenta ${accountId}:`, error);
+        return [];
       }
-    } catch (error) {
-      console.error(`Error fetching campaigns for account ${accountId}:`, error);
-    }
-  }
+    });
 
-  console.log(`✅ Total campañas cargadas: ${allCampaigns.length}`);
-  return allCampaigns;
+    // Esperar todas las cuentas en paralelo
+    const results = await Promise.all(accountPromises);
+    const allCampaigns = results.flat();
+
+    const loadTime = Date.now() - startTime;
+    console.log(`✅ ${allCampaigns.length} campañas cargadas en ${loadTime}ms`);
+
+    // Guardar en cache
+    cache.campaigns = {
+      data: allCampaigns,
+      timestamp: Date.now(),
+    };
+
+    return allCampaigns;
+  } catch (error) {
+    console.error('❌ Error general cargando campañas:', error);
+    return [];
+  }
 }
 
 /**
- * Fetch ad sets with insights
+ * Fetch ad sets with insights - OPTIMIZED
  * @param campaignId Optional - filter by campaign ID
  */
 export async function fetchMetaAdSets(campaignId?: string): Promise<AdSet[]> {
+  // Check cache first (only if no campaign filter)
+  if (!campaignId && isCacheValid(cache.adsets)) {
+    console.log('✅ Usando adsets desde cache');
+    return cache.adsets!.data;
+  }
+
   if (!ACCESS_TOKEN) {
     console.error('❌ META ACCESS TOKEN no configurado');
     return [];
   }
 
-  const allAdSets: AdSet[] = [];
+  const startTime = Date.now();
+  console.log('🚀 Cargando ad sets desde Meta API...');
 
-  for (const accountId of AD_ACCOUNT_IDS) {
-    if (!accountId) continue;
+  try {
+    // Paralelizar las llamadas a cada cuenta
+    const accountPromises = AD_ACCOUNT_IDS.filter(id => id).map(async (accountId) => {
+      try {
+        // OPTIMIZACIÓN: Solicitar insights como campo anidado
+        let url = `${META_GRAPH_API_BASE}/act_${accountId}/adsets?fields=id,name,status,campaign_id,daily_budget,lifetime_budget,insights{spend,actions,action_values}&limit=100&access_token=${ACCESS_TOKEN}`;
+        
+        if (campaignId) {
+          url += `&filtering=[{"field":"campaign.id","operator":"EQUAL","value":"${campaignId}"}]`;
+        }
 
-    try {
-      console.log(`📊 Obteniendo ad sets de cuenta: ${accountId}`);
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          console.error(`Error en cuenta ${accountId}:`, response.status);
+          return [];
+        }
 
-      // Fetch ad sets
-      let adsetsUrl = `${META_GRAPH_API_BASE}/act_${accountId}/adsets?fields=id,name,status,campaign_id,daily_budget,lifetime_budget&access_token=${ACCESS_TOKEN}`;
-      if (campaignId) {
-        adsetsUrl += `&filtering=[{"field":"campaign.id","operator":"EQUAL","value":"${campaignId}"}]`;
-      }
+        const data = await response.json();
+        const adsets = data.data || [];
 
-      const adsetsResponse = await fetch(adsetsUrl);
-      
-      if (!adsetsResponse.ok) {
-        console.error(`Error fetching ad sets for ${accountId}:`, await adsetsResponse.text());
-        continue;
-      }
+        return adsets.map((adset: any) => {
+          const insights = adset.insights?.data?.[0] || {};
+          const metrics = parseInsights(insights);
 
-      const adsetsData = await adsetsResponse.json();
-      const adsets = adsetsData.data || [];
-
-      // Fetch insights for each ad set
-      for (const adset of adsets) {
-        try {
-          const insightsUrl = `${META_GRAPH_API_BASE}/${adset.id}/insights?fields=spend,actions,action_values&access_token=${ACCESS_TOKEN}`;
-          const insightsResponse = await fetch(insightsUrl);
-
-          if (!insightsResponse.ok) {
-            console.warn(`No insights for ad set ${adset.id}`);
-            allAdSets.push({
-              id: adset.id,
-              name: adset.name,
-              status: adset.status,
-              campaignId: adset.campaign_id,
-              daily_budget: adset.daily_budget ? parseFloat(adset.daily_budget) / 100 : undefined,
-              lifetime_budget: adset.lifetime_budget ? parseFloat(adset.lifetime_budget) / 100 : undefined,
-              spent: 0,
-              conversations: 0,
-              sales: 0,
-              revenue: 0,
-              roas: 0,
-              cvr: 0,
-            });
-            continue;
-          }
-
-          const insightsData = await insightsResponse.json();
-          const insights = insightsData.data?.[0] || {};
-
-          // Parse metrics (same logic as campaigns)
-          const spent = parseFloat(insights.spend || '0');
-
-          const actions = insights.actions || [];
-          const conversationAction = actions.find(
-            (a: any) => 
-              a.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-              a.action_type === 'lead'
-          );
-          const conversations = conversationAction ? parseInt(conversationAction.value, 10) : 0;
-
-          const actionValues = insights.action_values || [];
-          const purchaseAction = actionValues.find(
-            (a: any) => 
-              a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
-              a.action_type === 'omni_purchase'
-          );
-          const revenue = purchaseAction ? parseFloat(purchaseAction.value) : 0;
-
-          const salesAction = actions.find(
-            (a: any) => 
-              a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
-              a.action_type === 'omni_purchase'
-          );
-          const sales = salesAction ? parseInt(salesAction.value, 10) : 0;
-
-          const roas = spent > 0 ? revenue / spent : 0;
-          const cvr = conversations > 0 ? (sales / conversations) * 100 : 0;
-
-          allAdSets.push({
+          return {
             id: adset.id,
             name: adset.name,
             status: adset.status,
             campaignId: adset.campaign_id,
             daily_budget: adset.daily_budget ? parseFloat(adset.daily_budget) / 100 : undefined,
             lifetime_budget: adset.lifetime_budget ? parseFloat(adset.lifetime_budget) / 100 : undefined,
-            spent,
-            conversations,
-            sales,
-            revenue,
-            roas,
-            cvr,
-          });
-        } catch (error) {
-          console.error(`Error fetching insights for ad set ${adset.id}:`, error);
-        }
+            ...metrics,
+          };
+        });
+      } catch (error) {
+        console.error(`Error en cuenta ${accountId}:`, error);
+        return [];
       }
-    } catch (error) {
-      console.error(`Error fetching ad sets for account ${accountId}:`, error);
-    }
-  }
+    });
 
-  console.log(`✅ Total ad sets cargados: ${allAdSets.length}`);
-  return allAdSets;
+    const results = await Promise.all(accountPromises);
+    const allAdSets = results.flat();
+
+    const loadTime = Date.now() - startTime;
+    console.log(`✅ ${allAdSets.length} ad sets cargados en ${loadTime}ms`);
+
+    // Guardar en cache (solo si no hay filtro)
+    if (!campaignId) {
+      cache.adsets = {
+        data: allAdSets,
+        timestamp: Date.now(),
+      };
+    }
+
+    return allAdSets;
+  } catch (error) {
+    console.error('❌ Error general cargando ad sets:', error);
+    return [];
+  }
 }
 
 /**
- * Fetch ads with insights
+ * Fetch ads with insights - OPTIMIZED
  * @param adSetId Optional - filter by ad set ID
  */
 export async function fetchMetaAds(adSetId?: string): Promise<Ad[]> {
+  // Check cache first (only if no adset filter)
+  if (!adSetId && isCacheValid(cache.ads)) {
+    console.log('✅ Usando ads desde cache');
+    return cache.ads!.data;
+  }
+
   if (!ACCESS_TOKEN) {
     console.error('❌ META ACCESS TOKEN no configurado');
     return [];
   }
 
-  const allAds: Ad[] = [];
+  const startTime = Date.now();
+  console.log('🚀 Cargando ads desde Meta API...');
 
-  for (const accountId of AD_ACCOUNT_IDS) {
-    if (!accountId) continue;
+  try {
+    // Paralelizar las llamadas a cada cuenta
+    const accountPromises = AD_ACCOUNT_IDS.filter(id => id).map(async (accountId) => {
+      try {
+        // OPTIMIZACIÓN: Solicitar insights como campo anidado
+        let url = `${META_GRAPH_API_BASE}/act_${accountId}/ads?fields=id,name,status,adset_id,insights{spend,actions,action_values}&limit=100&access_token=${ACCESS_TOKEN}`;
+        
+        if (adSetId) {
+          url += `&filtering=[{"field":"adset.id","operator":"EQUAL","value":"${adSetId}"}]`;
+        }
 
-    try {
-      console.log(`📊 Obteniendo ads de cuenta: ${accountId}`);
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          console.error(`Error en cuenta ${accountId}:`, response.status);
+          return [];
+        }
 
-      // Fetch ads
-      let adsUrl = `${META_GRAPH_API_BASE}/act_${accountId}/ads?fields=id,name,status,adset_id&access_token=${ACCESS_TOKEN}`;
-      if (adSetId) {
-        adsUrl += `&filtering=[{"field":"adset.id","operator":"EQUAL","value":"${adSetId}"}]`;
-      }
+        const data = await response.json();
+        const ads = data.data || [];
 
-      const adsResponse = await fetch(adsUrl);
-      
-      if (!adsResponse.ok) {
-        console.error(`Error fetching ads for ${accountId}:`, await adsResponse.text());
-        continue;
-      }
+        return ads.map((ad: any) => {
+          const insights = ad.insights?.data?.[0] || {};
+          const metrics = parseInsights(insights);
 
-      const adsData = await adsResponse.json();
-      const ads = adsData.data || [];
-
-      // Fetch insights for each ad
-      for (const ad of ads) {
-        try {
-          const insightsUrl = `${META_GRAPH_API_BASE}/${ad.id}/insights?fields=spend,actions,action_values&access_token=${ACCESS_TOKEN}`;
-          const insightsResponse = await fetch(insightsUrl);
-
-          if (!insightsResponse.ok) {
-            console.warn(`No insights for ad ${ad.id}`);
-            allAds.push({
-              id: ad.id,
-              name: ad.name,
-              status: ad.status,
-              adsetId: ad.adset_id,
-              spent: 0,
-              conversations: 0,
-              sales: 0,
-              revenue: 0,
-              roas: 0,
-              cvr: 0,
-            });
-            continue;
-          }
-
-          const insightsData = await insightsResponse.json();
-          const insights = insightsData.data?.[0] || {};
-
-          // Parse metrics (same logic as campaigns)
-          const spent = parseFloat(insights.spend || '0');
-
-          const actions = insights.actions || [];
-          const conversationAction = actions.find(
-            (a: any) => 
-              a.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
-              a.action_type === 'lead'
-          );
-          const conversations = conversationAction ? parseInt(conversationAction.value, 10) : 0;
-
-          const actionValues = insights.action_values || [];
-          const purchaseAction = actionValues.find(
-            (a: any) => 
-              a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
-              a.action_type === 'omni_purchase'
-          );
-          const revenue = purchaseAction ? parseFloat(purchaseAction.value) : 0;
-
-          const salesAction = actions.find(
-            (a: any) => 
-              a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
-              a.action_type === 'omni_purchase'
-          );
-          const sales = salesAction ? parseInt(salesAction.value, 10) : 0;
-
-          const roas = spent > 0 ? revenue / spent : 0;
-          const cvr = conversations > 0 ? (sales / conversations) * 100 : 0;
-
-          allAds.push({
+          return {
             id: ad.id,
             name: ad.name,
             status: ad.status,
             adsetId: ad.adset_id,
-            spent,
-            conversations,
-            sales,
-            revenue,
-            roas,
-            cvr,
-          });
-        } catch (error) {
-          console.error(`Error fetching insights for ad ${ad.id}:`, error);
-        }
+            ...metrics,
+          };
+        });
+      } catch (error) {
+        console.error(`Error en cuenta ${accountId}:`, error);
+        return [];
       }
-    } catch (error) {
-      console.error(`Error fetching ads for account ${accountId}:`, error);
-    }
-  }
+    });
 
-  console.log(`✅ Total ads cargados: ${allAds.length}`);
-  return allAds;
+    const results = await Promise.all(accountPromises);
+    const allAds = results.flat();
+
+    const loadTime = Date.now() - startTime;
+    console.log(`✅ ${allAds.length} ads cargados en ${loadTime}ms`);
+
+    // Guardar en cache (solo si no hay filtro)
+    if (!adSetId) {
+      cache.ads = {
+        data: allAds,
+        timestamp: Date.now(),
+      };
+    }
+
+    return allAds;
+  } catch (error) {
+    console.error('❌ Error general cargando ads:', error);
+    return [];
+  }
+}
+
+/**
+ * Clear all cache - useful for manual refresh
+ */
+export function clearCache() {
+  cache.campaigns = null;
+  cache.adsets = null;
+  cache.ads = null;
+  console.log('🗑️ Cache limpiado');
 }
