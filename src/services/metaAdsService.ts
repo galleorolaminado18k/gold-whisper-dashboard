@@ -201,7 +201,7 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
                 return {
                   id: campaign.id,
                   name: campaign.name,
-                  status: campaign.status,
+                  status: String(campaign.status || '').toLowerCase(),
                   objective: campaign.objective,
                   daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : undefined,
                   lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : undefined,
@@ -220,7 +220,7 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
 
               console.log(`📈 Campaña ${campaign.name}:`, {
                 id: campaign.id,
-                status: campaign.status,
+                status: String(campaign.status || '').toLowerCase(),
                 spent: metrics.spent,
                 conversations: metrics.conversations,
               });
@@ -228,7 +228,7 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
               return {
                 id: campaign.id,
                 name: campaign.name,
-                status: campaign.status,
+                status: String(campaign.status || '').toLowerCase(),
                 objective: campaign.objective,
                 daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : undefined,
                 lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : undefined,
@@ -239,7 +239,7 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
               return {
                 id: campaign.id,
                 name: campaign.name,
-                status: campaign.status,
+                status: String(campaign.status || '').toLowerCase(),
                 objective: campaign.objective,
                 daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : undefined,
                 lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : undefined,
@@ -337,7 +337,7 @@ export async function fetchMetaAdSets(campaignId?: string): Promise<AdSet[]> {
           return {
             id: adset.id,
             name: adset.name,
-            status: adset.status,
+            status: String(adset.status || '').toLowerCase(),
             campaignId: adset.campaign_id,
             daily_budget: adset.daily_budget ? parseFloat(adset.daily_budget) / 100 : undefined,
             lifetime_budget: adset.lifetime_budget ? parseFloat(adset.lifetime_budget) / 100 : undefined,
@@ -421,7 +421,7 @@ export async function fetchMetaAds(adSetId?: string): Promise<Ad[]> {
           return {
             id: ad.id,
             name: ad.name,
-            status: ad.status,
+            status: String(ad.status || '').toLowerCase(),
             adsetId: ad.adset_id,
             ...metrics,
           };
