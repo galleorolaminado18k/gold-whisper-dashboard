@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { MetricsCard } from "@/components/metrics-card"
-import { CampaignsTable, campaignsData, adsetsData, adsData } from "@/components/campaigns-table"
+import { CampaignsTable } from "@/components/campaigns-table"
 import { AIChartsModal } from "@/components/ai-charts-modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar, RefreshCw, Search, BarChart3, Download } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { fetchMetaCampaigns, fetchMetaAdSets, fetchMetaAds, type Campaign, type AdSet, type Ad } from "@/services/metaAdsService"
 
 type TabType = "campaigns" | "adsets" | "ads"
 
@@ -17,12 +18,54 @@ export default function DashboardPage() {
   const [showAICharts, setShowAICharts] = useState(false)
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused">("active")
+  
+  // Datos reales de Meta API
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [adsets, setAdsets] = useState<AdSet[]>([])
+  const [ads, setAds] = useState<Ad[]>([])
+  const [loading, setLoading] = useState(true)
 
   const { toast } = useToast()
 
+  // Función para cargar datos desde Meta API
+  const loadMetaData = async () => {
+    setLoading(true)
+    try {
+      console.log('🔄 Cargando datos desde Meta Ads API...')
+      const [campaignsData, adsetsData, adsData] = await Promise.all([
+        fetchMetaCampaigns(),
+        fetchMetaAdSets(),
+        fetchMetaAds()
+      ])
+      
+      setCampaigns(campaignsData)
+      setAdsets(adsetsData)
+      setAds(adsData)
+      
+      console.log('✅ Datos cargados desde Meta API:', {
+        campaigns: campaignsData.length,
+        adsets: adsetsData.length,
+        ads: adsData.length
+      })
+    } catch (error) {
+      console.error('❌ Error cargando datos de Meta:', error)
+      toast({
+        title: "Error al cargar datos",
+        description: "No se pudieron obtener los datos de Meta Ads. Verifica tus credenciales.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Cargar datos al montar y cada 30 segundos
   useEffect(() => {
+    loadMetaData()
+    
     const interval = setInterval(() => {
       setLastUpdate((prev) => prev + 30)
+      loadMetaData() // Recargar datos cada 30 segundos
     }, 30000)
 
     return () => clearInterval(interval)
@@ -50,42 +93,42 @@ export default function DashboardPage() {
       let campaignName = ""
 
       if (activeTab === "campaigns") {
-        // Filter to only the selected campaign
-        data = campaignsData.filter((c) => c.id === selectedCampaign)
+        // Filter to only the selected campaign - USING REAL DATA
+        data = campaigns.filter((c) => c.id === selectedCampaign)
         campaignName = data[0]?.name || "campaña"
         headers =
-          "ID,Nombre,Estado,Entrega,Presupuesto,Gastado,Conversaciones,Costo por Conv.,Ventas,Ingresos,ROAS,CVR\n"
+          "ID,Nombre,Estado,Presupuesto Diario,Presupuesto Total,Gastado,Conversaciones,Ventas,Ingresos,ROAS,CVR\n"
         rows = data
           .map(
             (item) =>
-              `"${item.id}","${item.name}","${item.status}","${item.delivery}","${item.budget}","${item.spent}","${item.conversations}","${item.costPerConv}","${item.sales}","${item.revenue}","${item.roas.toFixed(2)}","${item.cvr}"`,
+              `"${item.id}","${item.name}","${item.status}","${item.daily_budget || 'N/A'}","${item.lifetime_budget || 'N/A'}","${item.spent}","${item.conversations}","${item.sales}","${item.revenue}","${item.roas.toFixed(2)}","${item.cvr}"`,
           )
           .join("\n")
       } else if (activeTab === "adsets") {
-        // Filter adsets that belong to the selected campaign
-        data = adsetsData.filter((a) => a.campaignId === selectedCampaign)
-        const campaign = campaignsData.find((c) => c.id === selectedCampaign)
+        // Filter adsets that belong to the selected campaign - USING REAL DATA
+        data = adsets.filter((a) => a.campaignId === selectedCampaign)
+        const campaign = campaigns.find((c) => c.id === selectedCampaign)
         campaignName = campaign?.name || "campaña"
         headers =
-          "ID,Nombre,Estado,Entrega,Presupuesto,Gastado,Conversaciones,Costo por Conv.,Ventas,Ingresos,ROAS,CVR\n"
+          "ID,Nombre,Estado,Presupuesto Diario,Presupuesto Total,Gastado,Conversaciones,Ventas,Ingresos,ROAS,CVR\n"
         rows = data
           .map(
             (item) =>
-              `"${item.id}","${item.name}","${item.status}","${item.delivery}","${item.budget}","${item.spent}","${item.conversations}","${item.costPerConv}","${item.sales}","${item.revenue}","${item.roas.toFixed(2)}","${item.cvr}"`,
+              `"${item.id}","${item.name}","${item.status}","${item.daily_budget || 'N/A'}","${item.lifetime_budget || 'N/A'}","${item.spent}","${item.conversations}","${item.sales}","${item.revenue}","${item.roas.toFixed(2)}","${item.cvr}"`,
           )
           .join("\n")
       } else {
-        // Filter ads that belong to adsets of the selected campaign
-        const campaignAdsets = adsetsData.filter((a) => a.campaignId === selectedCampaign)
+        // Filter ads that belong to adsets of the selected campaign - USING REAL DATA
+        const campaignAdsets = adsets.filter((a) => a.campaignId === selectedCampaign)
         const adsetIds = campaignAdsets.map((a) => a.id)
-        data = adsData.filter((ad) => adsetIds.includes(ad.adsetId))
-        const campaign = campaignsData.find((c) => c.id === selectedCampaign)
+        data = ads.filter((ad) => adsetIds.includes(ad.adsetId))
+        const campaign = campaigns.find((c) => c.id === selectedCampaign)
         campaignName = campaign?.name || "campaña"
-        headers = "ID,Nombre,Estado,Entrega,Gastado,Conversaciones,Costo por Conv.,Ventas,Ingresos,ROAS,CVR\n"
+        headers = "ID,Nombre,Estado,Gastado,Conversaciones,Ventas,Ingresos,ROAS,CVR\n"
         rows = data
           .map(
             (item) =>
-              `"${item.id}","${item.name}","${item.status}","${item.delivery}","${item.spent}","${item.conversations}","${item.costPerConv}","${item.sales}","${item.revenue}","${item.roas.toFixed(2)}","${item.cvr}"`,
+              `"${item.id}","${item.name}","${item.status}","${item.spent}","${item.conversations}","${item.sales}","${item.revenue}","${item.roas.toFixed(2)}","${item.cvr}"`,
           )
           .join("\n")
       }
@@ -170,27 +213,37 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Metrics */}
+          {/* Metrics - CALCULATED FROM REAL META DATA */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <MetricsCard
               title="GASTO TOTAL"
-              value="$585,199"
+              value={loading ? "Cargando..." : `$${campaigns.reduce((sum, c) => sum + c.spent, 0).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
               subtitle="+12.3% vs anterior"
               trend="up"
               borderColor="border-l-blue-500"
             />
             <MetricsCard
               title="CONVERSACIONES"
-              value="0"
-              subtitle="$0.00 por conv."
+              value={loading ? "..." : campaigns.reduce((sum, c) => sum + c.conversations, 0).toString()}
+              subtitle={loading ? "..." : `$${(campaigns.reduce((sum, c) => sum + c.spent, 0) / (campaigns.reduce((sum, c) => sum + c.conversations, 0) || 1)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por conv.`}
               borderColor="border-l-purple-500"
             />
-            <MetricsCard title="VENTAS" value="0" subtitle="0.0% tasa conversión" borderColor="border-l-emerald-500" />
-            <MetricsCard title="ROAS" value="0.00x" subtitle="$0 ingresos" borderColor="border-l-amber-500" />
+            <MetricsCard 
+              title="VENTAS" 
+              value={loading ? "..." : campaigns.reduce((sum, c) => sum + c.sales, 0).toString()} 
+              subtitle={loading ? "..." : `${((campaigns.reduce((sum, c) => sum + c.sales, 0) / (campaigns.reduce((sum, c) => sum + c.conversations, 0) || 1)) * 100).toFixed(1)}% tasa conversión`} 
+              borderColor="border-l-emerald-500" 
+            />
+            <MetricsCard 
+              title="ROAS" 
+              value={loading ? "..." : `${((campaigns.reduce((sum, c) => sum + c.revenue, 0) / (campaigns.reduce((sum, c) => sum + c.spent, 0) || 1))).toFixed(2)}x`}
+              subtitle={loading ? "..." : `$${campaigns.reduce((sum, c) => sum + c.revenue, 0).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ingresos`} 
+              borderColor="border-l-amber-500" 
+            />
             <MetricsCard
               title="CVR PROMEDIO"
-              value="3.05%"
-              subtitle="132,710 impresiones"
+              value={loading ? "..." : `${(campaigns.reduce((sum, c) => sum + c.cvr, 0) / (campaigns.length || 1)).toFixed(2)}%`}
+              subtitle="De todas las campañas"
               borderColor="border-l-indigo-500"
             />
           </div>
@@ -268,6 +321,10 @@ export default function DashboardPage() {
               setSelectedCampaign(campaignId)
               setShowAICharts(true)
             }}
+            campaignsData={campaigns}
+            adsetsData={adsets}
+            adsData={ads}
+            loading={loading}
           />
         </div>
       </main>

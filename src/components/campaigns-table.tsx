@@ -145,12 +145,22 @@ interface CampaignsTableProps {
   statusFilter: "all" | "active" | "paused"
   onSelectCampaign: (id: string | null) => void
   onShowAICharts: (id: string) => void
+  // NEW: Accept real data from parent
+  campaignsData?: any[]
+  adsetsData?: any[]
+  adsData?: any[]
+  loading?: boolean
 }
 
-export function CampaignsTable({ activeTab, statusFilter, onSelectCampaign, onShowAICharts }: CampaignsTableProps) {
+export function CampaignsTable({ activeTab, statusFilter, onSelectCampaign, onShowAICharts, campaignsData: propCampaignsData, adsetsData: propAdsetsData, adsData: propAdsData, loading }: CampaignsTableProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const rawData = activeTab === "campaigns" ? campaignsData : activeTab === "adsets" ? adsetsData : adsData
+  // Use prop data if provided, otherwise fall back to mock data (for backward compatibility)
+  const rawData = activeTab === "campaigns" 
+    ? (propCampaignsData || campaignsData) 
+    : activeTab === "adsets" 
+    ? (propAdsetsData || adsetsData) 
+    : (propAdsData || adsData)
 
   const data = statusFilter === "all" ? rawData : rawData.filter((item: any) => item.status === statusFilter)
 
