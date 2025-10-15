@@ -135,8 +135,8 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
       try {
         console.log(`📡 Consultando cuenta: act_${accountId}`);
         
-        // OPTIMIZACIÓN: Solicitar insights como campo anidado en una sola llamada
-        const url = `${META_GRAPH_API_BASE}/act_${accountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget,insights{spend,actions,action_values}&limit=100&access_token=${ACCESS_TOKEN}`;
+        // SIMPLIFICADO: Primero intentar sin insights anidados
+        const url = `${META_GRAPH_API_BASE}/act_${accountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget&access_token=${ACCESS_TOKEN}`;
         
         console.log(`🔗 URL: ${url.replace(ACCESS_TOKEN, 'TOKEN_OCULTO')}`);
         
@@ -169,29 +169,80 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
           console.warn('1. La cuenta no tiene campañas activas');
           console.warn('2. El token no tiene permisos ads_read');
           console.warn('3. El ID de cuenta es incorrecto');
+          return [];
         }
 
-        return campaigns.map((campaign: any) => {
-          const insights = campaign.insights?.data?.[0] || {};
-          const metrics = parseInsights(insights);
+        // Obtener insights para cada campaña (batch de 5 en 5 para no saturar)
+        const campaignsWithInsights = [];
+        for (let i = 0; i < campaigns.length; i += 5) {
+          const batch = campaigns.slice(i, i + 5);
+          const batchPromises = batch.map(async (campaign: any) => {
+            try {
+              const insightsUrl = `${META_GRAPH_API_BASE}/${campaign.id}/insights?fields=spend,actions,action_values&date_preset=last_30d&access_token=${ACCESS_TOKEN}`;
+              const insightsResponse = await fetch(insightsUrl);
+              
+              if (!insightsResponse.ok) {
+                console.warn(`⚠️ No insights para campaña ${campaign.id}`);
+                return {
+                  id: campaign.id,
+                  name: campaign.name,
+                  status: campaign.status,
+                  objective: campaign.objective,
+                  daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : undefined,
+                  lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : undefined,
+                  spent: 0,
+                  conversations: 0,
+                  sales: 0,
+                  revenue: 0,
+                  roas: 0,
+                  cvr: 0,
+                };
+              }
 
-          console.log(`📈 Campaña ${campaign.name}:`, {
-            id: campaign.id,
-            status: campaign.status,
-            spent: metrics.spent,
-            conversations: metrics.conversations,
+              const insightsData = await insightsResponse.json();
+              const insights = insightsData.data?.[0] || {};
+              const metrics = parseInsights(insights);
+
+              console.log(`📈 Campaña ${campaign.name}:`, {
+                id: campaign.id,
+                status: campaign.status,
+                spent: metrics.spent,
+                conversations: metrics.conversations,
+              });
+
+              return {
+                id: campaign.id,
+                name: campaign.name,
+                status: campaign.status,
+                objective: campaign.objective,
+                daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : undefined,
+                lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : undefined,
+                ...metrics,
+              };
+            } catch (error) {
+              console.error(`❌ Error obteniendo insights para ${campaign.id}:`, error);
+              return {
+                id: campaign.id,
+                name: campaign.name,
+                status: campaign.status,
+                objective: campaign.objective,
+                daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : undefined,
+                lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : undefined,
+                spent: 0,
+                conversations: 0,
+                sales: 0,
+                revenue: 0,
+                roas: 0,
+                cvr: 0,
+              };
+            }
           });
 
-          return {
-            id: campaign.id,
-            name: campaign.name,
-            status: campaign.status,
-            objective: campaign.objective,
-            daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : undefined,
-            lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : undefined,
-            ...metrics,
-          };
-        });
+          const batchResults = await Promise.all(batchPromises);
+          campaignsWithInsights.push(...batchResults);
+        }
+
+        return campaignsWithInsights;
       } catch (error) {
         console.error(`❌ Error crítico en cuenta ${accountId}:`, error);
         if (error instanceof Error) {
