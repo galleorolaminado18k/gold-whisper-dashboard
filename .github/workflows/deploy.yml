@@ -13,15 +13,23 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://evjgujiyjplvbudgfiwr.supabase.co
       VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2amd1aml5anBsdmJ1ZGdmaXdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwOTc4NzIsImV4cCI6MjA3NTY3Mzg3Mn0.EnJIuzxjw6tpURxclEZ60ySDqKkz6vltjSQPEWHtYzI
-      # Para habilitar el widget de Chatwoot en producción, define los secretos
-      # en Settings > Secrets and variables > Actions del repositorio:
-      #   VITE_CHATWOOT_WEBSITE_TOKEN = <tu token del widget>
+      # Chatwoot
       VITE_CHATWOOT_ENABLED: true
       VITE_CHATWOOT_URL: https://app.chatwoot.com
       VITE_CHATWOOT_WEBSITE_TOKEN: c5S9SqxkumtX7GAZdc9LQnri
-      # Bridge API (para CRM y envío de mensajes)
       VITE_BRIDGE_API_URL: https://chatwoot-proxy-galle.galleorolaminado18k.workers.dev
       VITE_CHATWOOT_ACCOUNT_ID: 138167
+      # Meta Ads API
+      VITE_META_BUSINESS_ID: 1067806144007153
+      VITE_META_ACCESS_TOKEN: EAAC4zHE6iMYBPt67m4GY5ML3mWCGeBPiO6N6i6i751ZCOfdSSytbfrXnQ6mRcZBHhJXZBmZCWmgZB4V9Ws4oBpQTTMO6zequoZBNBRuXgHGggZCMNWAaMB3L2ubFyBieDeMj5WLP01AZB04Q7vC0DOs1SGkUUszktaBiXcVKapvGwXwotsTyy0MHZA1I52fZB4Rv4DVQZDZD
+      VITE_META_AD_ACCOUNT_IDS: 360084149294973,5518735214914409
+      VITE_META_AD_ACCOUNT_NAMES: orolaminado18kcucuta,GALLE 18K DETAL
+      VITE_META_AD_ACCOUNT_ID: 360084149294973
+      VITE_META_AD_ACCOUNT_NAME: orolaminado18kcucuta
+      # Fallback Auth
+      VITE_FALLBACK_AUTH_EMAIL: demo@dashboard.galle18k.com
+      VITE_ENABLE_FALLBACK_AUTH: true
+      VITE_FALLBACK_ALLOWED_EMAILS: demo@dashboard.galle18k.com,galleorolaminado18k@gmail.com
 
     steps:
       - name: Checkout 🛎️
