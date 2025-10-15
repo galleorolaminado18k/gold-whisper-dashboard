@@ -14,10 +14,10 @@ interface DeliveryStatus {
 }
 
 const deliveryStats: DeliveryStatus[] = [
-  { label: "Entregado", count: 187, percentage: 78, icon: CheckCircle2, variant: "success", gifSrc: "/gifs/check.gif" },
-  { label: "En tránsito", count: 42, percentage: 17.5, icon: Truck, variant: "info", gifSrc: "/gifs/truck.gif" },
-  { label: "Devolución en tránsito", count: 8, percentage: 3.3, icon: RotateCcw, variant: "warning", gifSrc: "/gifs/return.gif" },
-  { label: "Devolución completada", count: 3, percentage: 1.2, icon: Package, variant: "danger", gifSrc: "/gifs/box.gif" },
+  { label: "Entregado", count: 187, percentage: 78, icon: CheckCircle2, variant: "success" },
+  { label: "En tránsito", count: 42, percentage: 17.5, icon: Truck, variant: "info" },
+  { label: "Devolución en tránsito", count: 8, percentage: 3.3, icon: RotateCcw, variant: "warning" },
+  { label: "Devolución completada", count: 3, percentage: 1.2, icon: Package, variant: "danger" },
 ];
 
 const variantColors = {
