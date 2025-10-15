@@ -11,6 +11,12 @@ const CACHE_TTL = 2 * 60 * 1000; // 2 minutos de cache
 const ACCESS_TOKEN = import.meta.env.VITE_META_ACCESS_TOKEN || '';
 const ACCESS_TOKEN_2 = import.meta.env.VITE_META_ACCESS_TOKEN_2 || '';
 const AD_ACCOUNT_IDS = (import.meta.env.VITE_META_AD_ACCOUNT_IDS || '').split(',').map(id => id.trim());
+const AD_ACCOUNT_NAMES_ARR = (import.meta.env.VITE_META_AD_ACCOUNT_NAMES || '').split(',').map(s => s.trim());
+const AD_ACCOUNT_NAME_MAP: Record<string, string> = AD_ACCOUNT_IDS.reduce((acc, id, idx) => {
+  const name = AD_ACCOUNT_NAMES_ARR[idx] || id;
+  acc[id] = name;
+  return acc;
+}, {} as Record<string, string>);
 
 // Mapeo de cuenta a token (ambas cuentas usan el mismo token)
 const ACCOUNT_TOKENS: Record<string, string> = {
@@ -44,9 +50,12 @@ export interface Campaign {
   id: string;
   name: string;
   status: string;
+  accountId?: string;
+  detail?: string; // account name shown under campaign name
   objective?: string;
   daily_budget?: number;
   lifetime_budget?: number;
+  budget?: number; // effective daily budget (campaign or sum of ad sets)
   spent: number;
   conversations: number;
   sales: number;
@@ -202,9 +211,11 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
                   id: campaign.id,
                   name: campaign.name,
                   status: String(campaign.status || '').toLowerCase(),
+                  accountId: accountId,
+                  detail: AD_ACCOUNT_NAME_MAP[accountId] || accountId,
                   objective: campaign.objective,
-                  daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : undefined,
-                  lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : undefined,
+                  daily_budget: campaign.daily_budget ? (() => { const v = parseFloat(campaign.daily_budget); return v > 100000 ? v / 100 : v; })() : undefined,
+                  lifetime_budget: campaign.lifetime_budget ? (() => { const v = parseFloat(campaign.lifetime_budget); return v > 100000 ? v / 100 : v; })() : undefined,
                   spent: 0,
                   conversations: 0,
                   sales: 0,
@@ -229,9 +240,11 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
                 id: campaign.id,
                 name: campaign.name,
                 status: String(campaign.status || '').toLowerCase(),
+                accountId: accountId,
+                detail: AD_ACCOUNT_NAME_MAP[accountId] || accountId,
                 objective: campaign.objective,
-                daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : undefined,
-                lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : undefined,
+                daily_budget: campaign.daily_budget ? (() => { const v = parseFloat(campaign.daily_budget); return v > 100000 ? v / 100 : v; })() : undefined,
+                lifetime_budget: campaign.lifetime_budget ? (() => { const v = parseFloat(campaign.lifetime_budget); return v > 100000 ? v / 100 : v; })() : undefined,
                 ...metrics,
               };
             } catch (error) {
@@ -240,9 +253,11 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
                 id: campaign.id,
                 name: campaign.name,
                 status: String(campaign.status || '').toLowerCase(),
+                accountId: accountId,
+                detail: AD_ACCOUNT_NAME_MAP[accountId] || accountId,
                 objective: campaign.objective,
-                daily_budget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : undefined,
-                lifetime_budget: campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : undefined,
+                daily_budget: campaign.daily_budget ? (() => { const v = parseFloat(campaign.daily_budget); return v > 100000 ? v / 100 : v; })() : undefined,
+                lifetime_budget: campaign.lifetime_budget ? (() => { const v = parseFloat(campaign.lifetime_budget); return v > 100000 ? v / 100 : v; })() : undefined,
                 spent: 0,
                 conversations: 0,
                 sales: 0,
@@ -339,8 +354,8 @@ export async function fetchMetaAdSets(campaignId?: string): Promise<AdSet[]> {
             name: adset.name,
             status: String(adset.status || '').toLowerCase(),
             campaignId: adset.campaign_id,
-            daily_budget: adset.daily_budget ? parseFloat(adset.daily_budget) / 100 : undefined,
-            lifetime_budget: adset.lifetime_budget ? parseFloat(adset.lifetime_budget) / 100 : undefined,
+            daily_budget: adset.daily_budget ? (() => { const v = parseFloat(adset.daily_budget); return v > 100000 ? v / 100 : v; })() : undefined,
+            lifetime_budget: adset.lifetime_budget ? (() => { const v = parseFloat(adset.lifetime_budget); return v > 100000 ? v / 100 : v; })() : undefined,
             ...metrics,
           };
         });
