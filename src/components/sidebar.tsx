@@ -1,5 +1,3 @@
-"use client"
-
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
@@ -14,8 +12,7 @@ import {
   MapPin,
   Settings,
 } from "lucide-react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { Link, useLocation } from "react-router-dom"
 
 const navigation = [
   { name: "Dashboard", icon: LayoutDashboard, href: "/" },
@@ -32,7 +29,8 @@ const navigation = [
 ]
 
 export function Sidebar() {
-  const pathname = usePathname()
+  const location = useLocation()
+  const pathname = location.pathname
 
   return (
     <aside className="w-80 bg-[#0a0a0a] flex flex-col">
@@ -61,7 +59,7 @@ export function Sidebar() {
           return (
             <Link
               key={item.name}
-              href={item.href}
+              to={item.href}
               className={cn(
                 "flex items-center gap-3 px-4 py-3 rounded-xl text-base font-normal transition-all duration-200",
                 isActive
