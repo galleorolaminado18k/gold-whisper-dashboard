@@ -329,7 +329,33 @@ export function CampaignsTable({ activeTab, statusFilter, onSelectCampaign, onSh
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {data.map((item: any) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={12} className="px-4 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <p className="text-muted-foreground">Cargando datos desde Meta Ads...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : data.length === 0 ? (
+                <tr>
+                  <td colSpan={12} className="px-4 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="text-4xl">📊</div>
+                      <p className="text-lg font-semibold text-foreground">No se encontraron {activeTab === "campaigns" ? "campañas" : activeTab === "adsets" ? "conjuntos de anuncios" : "anuncios"}</p>
+                      <p className="text-sm text-muted-foreground max-w-md">
+                        Verifica que tu cuenta de Meta Ads tenga {activeTab === "campaigns" ? "campañas activas" : activeTab === "adsets" ? "conjuntos de anuncios" : "anuncios"} 
+                        {statusFilter !== "all" && ` con estado "${statusFilter}"`}.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Abre la consola del navegador (F12) para ver logs detallados.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                data.map((item: any) => (
                 <tr key={item.id} className="hover:bg-muted/20 transition-colors">
                   <td className="px-2 py-3">
                     <Checkbox
@@ -385,7 +411,8 @@ export function CampaignsTable({ activeTab, statusFilter, onSelectCampaign, onSh
                   </td>
                   <td className="px-2 py-3 text-foreground text-sm">{item.cvr}%</td>
                 </tr>
-              ))}
+              )))
+              }
             </tbody>
           </table>
         </div>

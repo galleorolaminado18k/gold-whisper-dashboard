@@ -119,8 +119,12 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
 
   if (!ACCESS_TOKEN) {
     console.error('❌ META ACCESS TOKEN no configurado');
+    console.error('Verifica que VITE_META_ACCESS_TOKEN esté en las variables de entorno');
     return [];
   }
+
+  console.log('🔐 Token configurado:', ACCESS_TOKEN.substring(0, 20) + '...');
+  console.log('🏢 Cuentas a consultar:', AD_ACCOUNT_IDS);
 
   const startTime = Date.now();
   console.log('🚀 Cargando campañas desde Meta API...');
@@ -129,22 +133,54 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
     // Paralelizar las llamadas a cada cuenta
     const accountPromises = AD_ACCOUNT_IDS.filter(id => id).map(async (accountId) => {
       try {
+        console.log(`📡 Consultando cuenta: act_${accountId}`);
+        
         // OPTIMIZACIÓN: Solicitar insights como campo anidado en una sola llamada
         const url = `${META_GRAPH_API_BASE}/act_${accountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget,insights{spend,actions,action_values}&limit=100&access_token=${ACCESS_TOKEN}`;
+        
+        console.log(`🔗 URL: ${url.replace(ACCESS_TOKEN, 'TOKEN_OCULTO')}`);
         
         const response = await fetch(url);
         
         if (!response.ok) {
-          console.error(`Error en cuenta ${accountId}:`, response.status);
+          const errorText = await response.text();
+          console.error(`❌ Error ${response.status} en cuenta ${accountId}:`, errorText);
+          
+          // Intentar parsear el error de Meta
+          try {
+            const errorJson = JSON.parse(errorText);
+            console.error('📄 Error detallado de Meta:', JSON.stringify(errorJson, null, 2));
+          } catch (e) {
+            console.error('📄 Error raw:', errorText);
+          }
+          
           return [];
         }
 
         const data = await response.json();
+        console.log(`📊 Respuesta de cuenta ${accountId}:`, JSON.stringify(data, null, 2));
+        
         const campaigns = data.data || [];
+        console.log(`✅ ${campaigns.length} campañas encontradas en cuenta ${accountId}`);
+
+        if (campaigns.length === 0) {
+          console.warn(`⚠️ No se encontraron campañas en la cuenta ${accountId}`);
+          console.warn('Posibles causas:');
+          console.warn('1. La cuenta no tiene campañas activas');
+          console.warn('2. El token no tiene permisos ads_read');
+          console.warn('3. El ID de cuenta es incorrecto');
+        }
 
         return campaigns.map((campaign: any) => {
           const insights = campaign.insights?.data?.[0] || {};
           const metrics = parseInsights(insights);
+
+          console.log(`📈 Campaña ${campaign.name}:`, {
+            id: campaign.id,
+            status: campaign.status,
+            spent: metrics.spent,
+            conversations: metrics.conversations,
+          });
 
           return {
             id: campaign.id,
@@ -157,7 +193,10 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
           };
         });
       } catch (error) {
-        console.error(`Error en cuenta ${accountId}:`, error);
+        console.error(`❌ Error crítico en cuenta ${accountId}:`, error);
+        if (error instanceof Error) {
+          console.error('Stack trace:', error.stack);
+        }
         return [];
       }
     });
