@@ -7,9 +7,21 @@
 const META_GRAPH_API_BASE = 'https://graph.facebook.com/v21.0';
 const CACHE_TTL = 2 * 60 * 1000; // 2 minutos de cache
 
-// Environment variables
+// Environment variables - SOPORTE MULTI-TOKEN
 const ACCESS_TOKEN = import.meta.env.VITE_META_ACCESS_TOKEN || '';
+const ACCESS_TOKEN_2 = import.meta.env.VITE_META_ACCESS_TOKEN_2 || '';
 const AD_ACCOUNT_IDS = (import.meta.env.VITE_META_AD_ACCOUNT_IDS || '').split(',').map(id => id.trim());
+
+// Mapeo de cuenta a token (si hay tokens específicos por cuenta)
+const ACCOUNT_TOKENS: Record<string, string> = {
+  '360084149294973': ACCESS_TOKEN_2 || ACCESS_TOKEN, // Token específico para orolaminado18kcucuta
+  '5518735214914409': ACCESS_TOKEN, // Token principal para GALLE 18K DETAL
+};
+
+// Función para obtener el token correcto según la cuenta
+function getTokenForAccount(accountId: string): string {
+  return ACCOUNT_TOKENS[accountId] || ACCESS_TOKEN;
+}
 
 // Cache en memoria
 interface CacheEntry<T> {
@@ -133,12 +145,14 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
     // Paralelizar las llamadas a cada cuenta
     const accountPromises = AD_ACCOUNT_IDS.filter(id => id).map(async (accountId) => {
       try {
-        console.log(`📡 Consultando cuenta: act_${accountId}`);
+        // Obtener el token correcto para esta cuenta
+        const accountToken = getTokenForAccount(accountId);
+        console.log(`📡 Consultando cuenta: act_${accountId} con token: ${accountToken.substring(0, 20)}...`);
         
         // SIMPLIFICADO: Primero intentar sin insights anidados
-        const url = `${META_GRAPH_API_BASE}/act_${accountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget&access_token=${ACCESS_TOKEN}`;
+        const url = `${META_GRAPH_API_BASE}/act_${accountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget&access_token=${accountToken}`;
         
-        console.log(`🔗 URL: ${url.replace(ACCESS_TOKEN, 'TOKEN_OCULTO')}`);
+        console.log(`🔗 URL: ${url.replace(accountToken, 'TOKEN_OCULTO')}`);
         
         const response = await fetch(url);
         
@@ -178,7 +192,8 @@ export async function fetchMetaCampaigns(): Promise<Campaign[]> {
           const batch = campaigns.slice(i, i + 5);
           const batchPromises = batch.map(async (campaign: any) => {
             try {
-              const insightsUrl = `${META_GRAPH_API_BASE}/${campaign.id}/insights?fields=spend,actions,action_values&date_preset=last_30d&access_token=${ACCESS_TOKEN}`;
+              // Usar el token correcto para esta cuenta
+              const insightsUrl = `${META_GRAPH_API_BASE}/${campaign.id}/insights?fields=spend,actions,action_values&date_preset=last_30d&access_token=${accountToken}`;
               const insightsResponse = await fetch(insightsUrl);
               
               if (!insightsResponse.ok) {
@@ -295,8 +310,11 @@ export async function fetchMetaAdSets(campaignId?: string): Promise<AdSet[]> {
     // Paralelizar las llamadas a cada cuenta
     const accountPromises = AD_ACCOUNT_IDS.filter(id => id).map(async (accountId) => {
       try {
+        // Obtener el token correcto para esta cuenta
+        const accountToken = getTokenForAccount(accountId);
+        
         // OPTIMIZACIÓN: Solicitar insights como campo anidado
-        let url = `${META_GRAPH_API_BASE}/act_${accountId}/adsets?fields=id,name,status,campaign_id,daily_budget,lifetime_budget,insights{spend,actions,action_values}&limit=100&access_token=${ACCESS_TOKEN}`;
+        let url = `${META_GRAPH_API_BASE}/act_${accountId}/adsets?fields=id,name,status,campaign_id,daily_budget,lifetime_budget,insights{spend,actions,action_values}&limit=100&access_token=${accountToken}`;
         
         if (campaignId) {
           url += `&filtering=[{"field":"campaign.id","operator":"EQUAL","value":"${campaignId}"}]`;
@@ -376,8 +394,11 @@ export async function fetchMetaAds(adSetId?: string): Promise<Ad[]> {
     // Paralelizar las llamadas a cada cuenta
     const accountPromises = AD_ACCOUNT_IDS.filter(id => id).map(async (accountId) => {
       try {
+        // Obtener el token correcto para esta cuenta
+        const accountToken = getTokenForAccount(accountId);
+        
         // OPTIMIZACIÓN: Solicitar insights como campo anidado
-        let url = `${META_GRAPH_API_BASE}/act_${accountId}/ads?fields=id,name,status,adset_id,insights{spend,actions,action_values}&limit=100&access_token=${ACCESS_TOKEN}`;
+        let url = `${META_GRAPH_API_BASE}/act_${accountId}/ads?fields=id,name,status,adset_id,insights{spend,actions,action_values}&limit=100&access_token=${accountToken}`;
         
         if (adSetId) {
           url += `&filtering=[{"field":"adset.id","operator":"EQUAL","value":"${adSetId}"}]`;
