@@ -1,4 +1,4 @@
-// src/App.tsx
+﻿// src/App.tsx
 import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -11,12 +11,14 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import CRMRoute from "./pages/CRM";                 // CRM actual (tabla + tabs)
-import CRMInbox from "./pages/CRMInbox";            // 👈 NUEVO: inbox 3 paneles
+import CRMInbox from "./pages/CRMInbox";            // ðŸ‘ˆ NUEVO: inbox 3 paneles
 import Conversations from "./pages/Conversations";
 import Advertising from "./pages/Advertising";
-import AdvertisingV2 from "./pages/AdvertisingV2";
-import Sales from "./pages/Sales";                  // 👈 NUEVO: Ventas
-import Billing from "./pages/Billing";              // 👈 NUEVO: Facturación
+import AdvertisingV0 from "./pages/AdvertisingV0";
+import AdvertisingDashboard from "@src/client/pages/AdvertisingDashboard";
+import AIAnalytics from "./pages/AIAnalytics";      // ðŸ‘ˆ NUEVO: AnÃ¡lisis IA con Gemini
+import Sales from "./pages/Sales";                  // ðŸ‘ˆ NUEVO: Ventas
+import Billing from "./pages/Billing";              // ðŸ‘ˆ NUEVO: FacturaciÃ³n
 import Deliveries from "./pages/Deliveries";
 import Payments from "./pages/Payments";
 import Customers from "./pages/Customers";
@@ -67,7 +69,7 @@ const App: React.FC = () => {
                 }
               />
 
-              {/* 👇 NUEVA RUTA: Inbox tipo 3 paneles (no reemplaza al CRM existente) */}
+              {/* ðŸ‘‡ NUEVA RUTA: Inbox tipo 3 paneles (no reemplaza al CRM existente) */}
               <Route
                 path="/crm-inbox"
                 element={
@@ -89,7 +91,15 @@ const App: React.FC = () => {
                 path="/advertising"
                 element={
                   <ProtectedRoute>
-                    <AdvertisingV2 />
+                    <AdvertisingDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/ai-analytics"
+                element={
+                  <ProtectedRoute>
+                    <AIAnalytics />
                   </ProtectedRoute>
                 }
               />
@@ -168,3 +178,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
