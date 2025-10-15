@@ -6,7 +6,9 @@ import { AIChartsModal } from "@/components/ai-charts-modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
 import { Calendar, RefreshCw, Search, BarChart3, Download } from "lucide-react"
+import { campaignsData, adsetsData, adsData } from "@/components/campaigns-table"
 
 type TabType = "campaigns" | "adsets" | "ads"
 
@@ -15,6 +17,8 @@ export default function DashboardPage() {
   const [lastUpdate, setLastUpdate] = useState(0)
   const [showAICharts, setShowAICharts] = useState(false)
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused">("active")
+  const { toast } = useToast()
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -23,6 +27,94 @@ export default function DashboardPage() {
 
     return () => clearInterval(interval)
   }, [])
+
+  const handleExport = () => {
+    if (!selectedCampaign) {
+      toast({
+        title: "Selecciona una campaña",
+        description: "Debe seleccionar una campaña para exportar.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      let headers = ""
+      let rows = ""
+      let data: any[] = []
+      let campaignName = ""
+
+      if (activeTab === "campaigns") {
+        const campaign = campaignsData.find(c => c.id === selectedCampaign)
+        campaignName = campaign?.name || "campaña"
+        data = campaignsData.filter(c => c.id === selectedCampaign)
+        headers = "ID,Nombre,Estado,Entrega,Presupuesto,Gastado,Conversaciones,Costo por Conv.,Ventas,Ingresos,ROAS,CVR\n"
+        rows = data
+          .map(
+            (item) =>
+              `"${item.id}","${item.name}","${item.status}","${item.delivery}","${item.budget}","${item.spent}","${item.conversations}","${item.costPerConv}","${item.sales}","${item.revenue}","${item.roas.toFixed(2)}","${item.cvr}"`,
+          )
+          .join("\n")
+      } else if (activeTab === "adsets") {
+        const campaign = campaignsData.find(c => c.id === selectedCampaign)
+        campaignName = campaign?.name || "campaña"
+        data = adsetsData.filter(a => a.campaignId === selectedCampaign)
+        headers = "ID,Nombre,Estado,Entrega,Presupuesto,Gastado,Conversaciones,Costo por Conv.,Ventas,Ingresos,ROAS,CVR\n"
+        rows = data
+          .map(
+            (item) =>
+              `"${item.id}","${item.name}","${item.status}","${item.delivery}","${item.budget}","${item.spent}","${item.conversations}","${item.costPerConv}","${item.sales}","${item.revenue}","${item.roas.toFixed(2)}","${item.cvr}"`,
+          )
+          .join("\n")
+      } else {
+        const campaign = campaignsData.find(c => c.id === selectedCampaign)
+        campaignName = campaign?.name || "campaña"
+        const campaignAdsets = adsetsData.filter(a => a.campaignId === selectedCampaign)
+        const adsetIds = campaignAdsets.map(a => a.id)
+        data = adsData.filter(ad => adsetIds.includes(ad.adsetId))
+        headers = "ID,Nombre,Estado,Entrega,Gastado,Conversaciones,Costo por Conv.,Ventas,Ingresos,ROAS,CVR\n"
+        rows = data
+          .map(
+            (item) =>
+              `"${item.id}","${item.name}","${item.status}","${item.delivery}","${item.spent}","${item.conversations}","${item.costPerConv}","${item.sales}","${item.revenue}","${item.roas.toFixed(2)}","${item.cvr}"`,
+          )
+          .join("\n")
+      }
+
+      if (data.length === 0) {
+        toast({
+          title: "Sin datos",
+          description: `No hay ${activeTab === "campaigns" ? "campaña" : activeTab === "adsets" ? "conjuntos de anuncios" : "anuncios"} para exportar.`,
+          variant: "destructive",
+        })
+        return
+      }
+
+      const csvContent = headers + rows
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `${campaignName.substring(0, 20)}-${activeTab}-${Date.now()}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Datos exportados",
+        description: `${data.length} registro(s) de la campaña exportados como CSV.`,
+        variant: "default",
+      })
+    } catch (error) {
+      console.error("Export error:", error)
+      toast({
+        title: "Error al exportar",
+        description: "Hubo un problema al generar el archivo CSV.",
+        variant: "destructive",
+      })
+    }
+  }
 
   return (
     <div className="flex h-screen bg-background">
@@ -97,7 +189,7 @@ export default function DashboardPage() {
               <Input placeholder="Buscar por nombre, identificador o métricas" className="pl-10 bg-white" />
             </div>
 
-            <Select defaultValue="active">
+            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
               <SelectTrigger className="w-[140px] bg-white border-2 border-gold">
                 <SelectValue />
               </SelectTrigger>
@@ -108,12 +200,34 @@ export default function DashboardPage() {
               </SelectContent>
             </Select>
 
-            <Button variant="outline" size="sm" className="bg-white" onClick={() => setShowAICharts(true)}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-white" 
+              onClick={() => {
+                if (!selectedCampaign) {
+                  toast({
+                    title: "Selecciona una campaña",
+                    description: "Debes seleccionar una campaña para ver los gráficos.",
+                    variant: "destructive",
+                  })
+                  return
+                }
+                setShowAICharts(true)
+              }}
+              disabled={!selectedCampaign}
+            >
               <BarChart3 className="w-4 h-4 mr-2" />
               Gráficos
             </Button>
 
-            <Button variant="outline" size="sm" className="bg-white">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-white"
+              onClick={handleExport}
+              disabled={!selectedCampaign}
+            >
               <Download className="w-4 h-4 mr-2" />
               Exportar
             </Button>
@@ -154,6 +268,14 @@ export default function DashboardPage() {
 
           <CampaignsTable
             activeTab={activeTab}
+            data={
+              activeTab === "campaigns"
+                ? campaignsData.filter(c => statusFilter === "all" || c.status === statusFilter)
+                : activeTab === "adsets"
+                  ? adsetsData.filter(a => statusFilter === "all" || a.status === statusFilter)
+                  : adsData.filter(a => statusFilter === "all" || a.status === statusFilter)
+            }
+            loading={false}
             onSelectCampaign={setSelectedCampaign}
             onShowAICharts={(campaignId) => {
               setSelectedCampaign(campaignId)
