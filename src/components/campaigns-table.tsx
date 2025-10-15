@@ -392,22 +392,26 @@ export function CampaignsTable({ activeTab, statusFilter, onSelectCampaign, onSh
                     </Badge>
                   </td>
                   {activeTab === "campaigns" && (
-                    <td className="px-2 py-3 text-foreground text-sm">${item.budget.toLocaleString()}</td>
+                    <td className="px-2 py-3 text-foreground text-sm">
+                      ${(
+                        (item.daily_budget ?? item.lifetime_budget ?? item.budget ?? 0)
+                      ).toLocaleString()}
+                    </td>
                   )}
                   <td className="px-2 py-3">
                     <div>
-                      <div className="font-semibold text-foreground text-sm">${item.spent.toLocaleString()}</div>
-                      {item.spentPercent > 0 && (
+                      <div className="font-semibold text-foreground text-sm">${(item.spent ?? 0).toLocaleString()}</div>
+                      {(item.spentPercent ?? 0) > 0 && (
                         <div className="text-xs text-muted-foreground">{item.spentPercent}%</div>
                       )}
                     </div>
                   </td>
                   <td className="px-2 py-3 text-foreground text-sm">{item.conversations}</td>
-                  <td className="px-2 py-3 text-foreground text-sm">${item.costPerConv.toLocaleString()}</td>
+                  <td className="px-2 py-3 text-foreground text-sm">${(((item.spent ?? 0) / ((item.conversations ?? 0) || 1)) || 0).toLocaleString()}</td>
                   <td className="px-2 py-3 text-emerald-600 font-semibold text-sm">{item.sales}</td>
-                  <td className="px-2 py-3 text-foreground text-sm">${item.revenue}K</td>
+                  <td className="px-2 py-3 text-foreground text-sm">${(item.revenue ?? 0).toLocaleString()}</td>
                   <td className="px-2 py-3">
-                    <span className="text-red-600 font-semibold text-sm">{item.roas.toFixed(2)}x</span>
+                    <span className="text-red-600 font-semibold text-sm">{(item.roas ?? 0).toFixed(2)}x</span>
                   </td>
                   <td className="px-2 py-3 text-foreground text-sm">{item.cvr}%</td>
                 </tr>
