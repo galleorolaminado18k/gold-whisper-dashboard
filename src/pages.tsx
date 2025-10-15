@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { MetricsCard } from "@/components/metrics-card"
-import { CampaignsTable } from "@/components/campaigns-table"
+import { CampaignsTable, campaignsData, adsetsData, adsData } from "@/components/campaigns-table"
 import { AIChartsModal } from "@/components/ai-charts-modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useToast } from "@/hooks/use-toast"
 import { Calendar, RefreshCw, Search, BarChart3, Download } from "lucide-react"
-import { campaignsData, adsetsData, adsData } from "@/components/campaigns-table"
+import { useToast } from "@/hooks/use-toast"
 
 type TabType = "campaigns" | "adsets" | "ads"
 
@@ -18,6 +17,7 @@ export default function DashboardPage() {
   const [showAICharts, setShowAICharts] = useState(false)
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused">("active")
+
   const { toast } = useToast()
 
   useEffect(() => {
@@ -28,8 +28,11 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [])
 
-  const handleExport = () => {
-    if (!selectedCampaign) {
+  const handleExportCampaigns = () => {
+    console.log("[v0] Export clicked. Selected campaign:", selectedCampaign)
+
+    if (!selectedCampaign || selectedCampaign === "") {
+      console.log("[v0] No campaign selected, showing toast")
       toast({
         title: "Selecciona una campaña",
         description: "Debe seleccionar una campaña para exportar.",
@@ -38,6 +41,8 @@ export default function DashboardPage() {
       return
     }
 
+    console.log("[v0] Campaign selected, proceeding with export")
+
     try {
       let headers = ""
       let rows = ""
@@ -45,10 +50,11 @@ export default function DashboardPage() {
       let campaignName = ""
 
       if (activeTab === "campaigns") {
-        const campaign = campaignsData.find(c => c.id === selectedCampaign)
-        campaignName = campaign?.name || "campaña"
-        data = campaignsData.filter(c => c.id === selectedCampaign)
-        headers = "ID,Nombre,Estado,Entrega,Presupuesto,Gastado,Conversaciones,Costo por Conv.,Ventas,Ingresos,ROAS,CVR\n"
+        // Filter to only the selected campaign
+        data = campaignsData.filter((c) => c.id === selectedCampaign)
+        campaignName = data[0]?.name || "campaña"
+        headers =
+          "ID,Nombre,Estado,Entrega,Presupuesto,Gastado,Conversaciones,Costo por Conv.,Ventas,Ingresos,ROAS,CVR\n"
         rows = data
           .map(
             (item) =>
@@ -56,10 +62,12 @@ export default function DashboardPage() {
           )
           .join("\n")
       } else if (activeTab === "adsets") {
-        const campaign = campaignsData.find(c => c.id === selectedCampaign)
+        // Filter adsets that belong to the selected campaign
+        data = adsetsData.filter((a) => a.campaignId === selectedCampaign)
+        const campaign = campaignsData.find((c) => c.id === selectedCampaign)
         campaignName = campaign?.name || "campaña"
-        data = adsetsData.filter(a => a.campaignId === selectedCampaign)
-        headers = "ID,Nombre,Estado,Entrega,Presupuesto,Gastado,Conversaciones,Costo por Conv.,Ventas,Ingresos,ROAS,CVR\n"
+        headers =
+          "ID,Nombre,Estado,Entrega,Presupuesto,Gastado,Conversaciones,Costo por Conv.,Ventas,Ingresos,ROAS,CVR\n"
         rows = data
           .map(
             (item) =>
@@ -67,11 +75,12 @@ export default function DashboardPage() {
           )
           .join("\n")
       } else {
-        const campaign = campaignsData.find(c => c.id === selectedCampaign)
+        // Filter ads that belong to adsets of the selected campaign
+        const campaignAdsets = adsetsData.filter((a) => a.campaignId === selectedCampaign)
+        const adsetIds = campaignAdsets.map((a) => a.id)
+        data = adsData.filter((ad) => adsetIds.includes(ad.adsetId))
+        const campaign = campaignsData.find((c) => c.id === selectedCampaign)
         campaignName = campaign?.name || "campaña"
-        const campaignAdsets = adsetsData.filter(a => a.campaignId === selectedCampaign)
-        const adsetIds = campaignAdsets.map(a => a.id)
-        data = adsData.filter(ad => adsetIds.includes(ad.adsetId))
         headers = "ID,Nombre,Estado,Entrega,Gastado,Conversaciones,Costo por Conv.,Ventas,Ingresos,ROAS,CVR\n"
         rows = data
           .map(
@@ -80,6 +89,8 @@ export default function DashboardPage() {
           )
           .join("\n")
       }
+
+      console.log("[v0] Data to export:", data.length, "records")
 
       if (data.length === 0) {
         toast({
@@ -101,13 +112,15 @@ export default function DashboardPage() {
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
 
+      console.log("[v0] Export successful")
+
       toast({
         title: "Datos exportados",
         description: `${data.length} registro(s) de la campaña exportados como CSV.`,
         variant: "default",
       })
     } catch (error) {
-      console.error("Export error:", error)
+      console.error("[v0] Export error:", error)
       toast({
         title: "Error al exportar",
         description: "Hubo un problema al generar el archivo CSV.",
@@ -189,7 +202,10 @@ export default function DashboardPage() {
               <Input placeholder="Buscar por nombre, identificador o métricas" className="pl-10 bg-white" />
             </div>
 
-            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+            <Select
+              defaultValue="active"
+              onValueChange={(value) => setStatusFilter(value as "all" | "active" | "paused")}
+            >
               <SelectTrigger className="w-[140px] bg-white border-2 border-gold">
                 <SelectValue />
               </SelectTrigger>
@@ -200,34 +216,12 @@ export default function DashboardPage() {
               </SelectContent>
             </Select>
 
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="bg-white" 
-              onClick={() => {
-                if (!selectedCampaign) {
-                  toast({
-                    title: "Selecciona una campaña",
-                    description: "Debes seleccionar una campaña para ver los gráficos.",
-                    variant: "destructive",
-                  })
-                  return
-                }
-                setShowAICharts(true)
-              }}
-              disabled={!selectedCampaign}
-            >
+            <Button variant="outline" size="sm" className="bg-white" onClick={() => setShowAICharts(true)}>
               <BarChart3 className="w-4 h-4 mr-2" />
               Gráficos
             </Button>
 
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="bg-white"
-              onClick={handleExport}
-              disabled={!selectedCampaign}
-            >
+            <Button variant="outline" size="sm" className="bg-white" onClick={handleExportCampaigns}>
               <Download className="w-4 h-4 mr-2" />
               Exportar
             </Button>
@@ -268,14 +262,7 @@ export default function DashboardPage() {
 
           <CampaignsTable
             activeTab={activeTab}
-            data={
-              activeTab === "campaigns"
-                ? campaignsData.filter(c => statusFilter === "all" || c.status === statusFilter)
-                : activeTab === "adsets"
-                  ? adsetsData.filter(a => statusFilter === "all" || a.status === statusFilter)
-                  : adsData.filter(a => statusFilter === "all" || a.status === statusFilter)
-            }
-            loading={false}
+            statusFilter={statusFilter}
             onSelectCampaign={setSelectedCampaign}
             onShowAICharts={(campaignId) => {
               setSelectedCampaign(campaignId)
@@ -287,6 +274,7 @@ export default function DashboardPage() {
 
       {showAICharts && (
         <AIChartsModal
+          isOpen={showAICharts}
           campaignId={selectedCampaign}
           onClose={() => {
             setShowAICharts(false)

@@ -3,8 +3,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { ArrowUpDown, Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useState } from "react"
 
-const campaignsData = [
+export const campaignsData = [
   {
     id: "120233445687010113",
     name: "Mensajes a WhatsApp del Mayo...",
@@ -58,7 +59,7 @@ const campaignsData = [
   },
 ]
 
-const adsetsData = [
+export const adsetsData = [
   {
     id: "120233445687010114",
     name: "Conjunto de anuncios 1",
@@ -78,7 +79,7 @@ const adsetsData = [
   },
 ]
 
-const adsData = [
+export const adsData = [
   {
     id: "120233445687010115",
     adsetId: "120233445687010114",
@@ -141,12 +142,30 @@ const metricsInfo = {
 
 interface CampaignsTableProps {
   activeTab: "campaigns" | "adsets" | "ads"
-  onSelectCampaign: (id: string) => void
+  statusFilter: "all" | "active" | "paused"
+  onSelectCampaign: (id: string | null) => void
   onShowAICharts: (id: string) => void
 }
 
-export function CampaignsTable({ activeTab, onSelectCampaign, onShowAICharts }: CampaignsTableProps) {
-  const data = activeTab === "campaigns" ? campaignsData : activeTab === "adsets" ? adsetsData : adsData
+export function CampaignsTable({ activeTab, statusFilter, onSelectCampaign, onShowAICharts }: CampaignsTableProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  const rawData = activeTab === "campaigns" ? campaignsData : activeTab === "adsets" ? adsetsData : adsData
+
+  const data = statusFilter === "all" ? rawData : rawData.filter((item: any) => item.status === statusFilter)
+
+  const handleCheckboxChange = (itemId: string, checked: boolean) => {
+    console.log("[v0] Checkbox changed:", itemId, checked)
+    if (checked) {
+      setSelectedId(itemId)
+      onSelectCampaign(itemId)
+      console.log("[v0] Campaign selected:", itemId)
+    } else {
+      setSelectedId(null)
+      onSelectCampaign(null)
+      console.log("[v0] Campaign deselected")
+    }
+  }
 
   return (
     <TooltipProvider>
@@ -303,7 +322,10 @@ export function CampaignsTable({ activeTab, onSelectCampaign, onShowAICharts }: 
               {data.map((item: any) => (
                 <tr key={item.id} className="hover:bg-muted/20 transition-colors">
                   <td className="px-2 py-3">
-                    <Checkbox />
+                    <Checkbox
+                      checked={selectedId === item.id}
+                      onCheckedChange={(checked) => handleCheckboxChange(item.id, checked as boolean)}
+                    />
                   </td>
                   <td className="px-2 py-3">
                     <Switch checked={item.status === "active"} className="data-[state=checked]:bg-emerald-500" />

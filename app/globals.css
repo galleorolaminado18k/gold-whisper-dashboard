@@ -39,6 +39,8 @@
   --sidebar-ring: oklch(0.65 0.18 65);
   --gold: oklch(0.65 0.18 65);
   --gold-light: oklch(0.75 0.15 70);
+  /* Added gold-dark color for gradients */
+  --gold-dark: oklch(0.55 0.2 60);
 }
 
 .dark {
@@ -76,6 +78,8 @@
   --sidebar-ring: oklch(0.7 0.18 65);
   --gold: oklch(0.7 0.18 65);
   --gold-light: oklch(0.8 0.15 70);
+  /* Added gold-dark color for dark mode */
+  --gold-dark: oklch(0.6 0.2 60);
 }
 
 @theme inline {
@@ -119,6 +123,8 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --color-gold: var(--gold);
   --color-gold-light: var(--gold-light);
+  /* Added gold-dark to theme */
+  --color-gold-dark: var(--gold-dark);
 }
 
 @layer base {
@@ -127,5 +133,33 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Custom scrollbar styles for professional look */
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 10px;
+    transition: background 0.2s ease;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
   }
 }

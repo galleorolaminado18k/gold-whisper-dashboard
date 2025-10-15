@@ -1,5 +1,3 @@
-"use client"
-
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
@@ -40,11 +38,90 @@ export function CampaignChat({ metrics }: CampaignChatProps) {
   // Determinar si las campañas están yendo bien o mal
   const isPerformingWell = metrics.roas > 2.0 && metrics.cvr > 2.5 && metrics.conversions > 50
 
-  // Generar mensaje inicial
   useEffect(() => {
-    const initialMessage = isPerformingWell
-      ? "¡Hola! Veo que tus campañas están teniendo un excelente rendimiento. Revisemos por qué nos está yendo bien para replicarlo en futuras campañas. ¿Qué te gustaría analizar primero?"
-      : "Hola, he revisado tus campañas y veo algunas áreas de oportunidad. Revisemos a fondo y analicemos qué tenemos que mejorar para optimizar tus resultados. ¿Por dónde quieres empezar?"
+    let initialMessage = ""
+
+    if (isPerformingWell) {
+      initialMessage =
+        "¡Hola! Veo que tus campañas están teniendo un excelente rendimiento. Revisemos por qué nos está yendo bien para replicarlo en futuras campañas. ¿Qué te gustaría analizar primero?"
+    } else {
+      // Analyze metrics to identify the most critical issue
+      const issues = []
+
+      if (metrics.roas < 1.0) {
+        issues.push({
+          priority: 1,
+          metric: "ROAS",
+          value: metrics.roas,
+          message:
+            "tu ROAS está por debajo de 1.0x, lo que significa que estás perdiendo dinero en cada peso invertido",
+        })
+      } else if (metrics.roas < 2.0) {
+        issues.push({
+          priority: 2,
+          metric: "ROAS",
+          value: metrics.roas,
+          message: "tu ROAS está por debajo del objetivo de 2.0x",
+        })
+      }
+
+      if (metrics.cvr < 1.5) {
+        issues.push({
+          priority: 1,
+          metric: "CVR",
+          value: metrics.cvr,
+          message: "tu tasa de conversión está críticamente baja (menos de 1.5%)",
+        })
+      } else if (metrics.cvr < 2.5) {
+        issues.push({
+          priority: 2,
+          metric: "CVR",
+          value: metrics.cvr,
+          message: "tu CVR está por debajo del benchmark de la industria (2.5-4.0%)",
+        })
+      }
+
+      if (metrics.conversions < 20) {
+        issues.push({
+          priority: 1,
+          metric: "Conversiones",
+          value: metrics.conversions,
+          message: "tienes muy pocas conversiones para optimizar efectivamente",
+        })
+      } else if (metrics.conversions < 50) {
+        issues.push({
+          priority: 2,
+          metric: "Conversiones",
+          value: metrics.conversions,
+          message: "necesitas más volumen de conversiones para escalar",
+        })
+      }
+
+      // Sort by priority (1 = critical, 2 = important)
+      issues.sort((a, b) => a.priority - b.priority)
+
+      if (issues.length > 0) {
+        const topIssue = issues[0]
+        initialMessage = `Hola, he revisado tus campañas a fondo y he identificado el problema principal: ${topIssue.message}.
+
+**Aquí está mi diagnóstico como experto:**
+
+📊 **Situación Actual:**
+- ROAS: ${metrics.roas.toFixed(2)}x ${metrics.roas < 1.0 ? "(CRÍTICO - Perdiendo dinero)" : metrics.roas < 2.0 ? "(Por debajo del objetivo)" : "(Aceptable)"}
+- CVR: ${metrics.cvr.toFixed(2)}% ${metrics.cvr < 1.5 ? "(CRÍTICO)" : metrics.cvr < 2.5 ? "(Necesita mejora)" : "(Bueno)"}
+- Conversiones: ${metrics.conversions} ${metrics.conversions < 20 ? "(Volumen muy bajo)" : metrics.conversions < 50 ? "(Volumen bajo)" : "(Volumen aceptable)"}
+- Gasto: $${metrics.spent.toLocaleString()} COP
+
+**🎯 Por dónde debemos empezar:**
+
+Vamos a enfocarnos primero en ${topIssue.metric === "ROAS" ? "mejorar tu retorno de inversión" : topIssue.metric === "CVR" ? "aumentar tu tasa de conversión" : "generar más conversiones"}. Esta es la palanca más importante para recuperar la rentabilidad de tus campañas.
+
+Te voy a guiar paso a paso para resolver esto. Empecemos analizando ${topIssue.metric === "ROAS" ? "qué campañas están quemando presupuesto sin retorno" : topIssue.metric === "CVR" ? "por qué tu audiencia no está convirtiendo" : "cómo optimizar tu segmentación y creativos"}.`
+      } else {
+        initialMessage =
+          "Hola, he revisado tus campañas y veo algunas áreas de oportunidad. Analicemos a fondo qué podemos mejorar para optimizar tus resultados y maximizar tu retorno de inversión."
+      }
+    }
 
     setMessages([
       {
@@ -52,7 +129,7 @@ export function CampaignChat({ metrics }: CampaignChatProps) {
         content: initialMessage,
       },
     ])
-  }, [isPerformingWell])
+  }, [isPerformingWell, metrics])
 
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return

@@ -1,3 +1,5 @@
+"use client"
+
 import { memo, useMemo, useState, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from "recharts"
