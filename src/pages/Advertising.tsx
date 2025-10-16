@@ -395,11 +395,13 @@ const Advertising = () => {
   }, [vistaActual, selectedCampaigns, adSetsData, datePreset, usingRealData]);
 
   // Obtener conjuntos de anuncios de campañas seleccionadas
-  const adSetsFromSelectedCampaigns = Array.from(selectedCampaigns).flatMap((campaignId) => {
-    const sets = adSetsData.get(campaignId) || [];
-    // Asegurar que solo entren ad sets de esa campaña
-    return sets.filter((s) => String(s.campaign_id) === String(campaignId));
-  });
+  const adSetsFromSelectedCampaigns = selectedCampaigns.size === 0
+    ? []
+    : Array.from(selectedCampaigns).flatMap((campaignId) => {
+        const sets = adSetsData.get(campaignId) || [];
+        // Asegurar que solo entren ad sets de esa campaña
+        return sets.filter((s) => String(s.campaign_id) === String(campaignId));
+      });
 
   // Obtener anuncios de conjuntos seleccionados
   
@@ -738,6 +740,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap((adSetId) => {
                 const target = v as "campañas" | "conjuntos" | "anuncios";
                 if (target === "conjuntos" && selectedCampaigns.size === 0) {
                   toast.info("Selecciona una campaña para ver sus conjuntos");
+                  setAdSetsData(new Map());
                   setVistaActual("campañas");
                   return;
                 }
@@ -755,10 +758,18 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap((adSetId) => {
                 <TabsTrigger value="campañas" className="data-[state=active]:bg-blue-50">
                   Campañas
                 </TabsTrigger>
-                <TabsTrigger value="conjuntos" className="data-[state=active]:bg-blue-50">
+                <TabsTrigger
+                  value="conjuntos"
+                  className={`data-[state=active]:bg-blue-50 ${selectedCampaigns.size === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  aria-disabled={selectedCampaigns.size === 0}
+                >
                   Conjuntos de anuncios
                 </TabsTrigger>
-                <TabsTrigger value="anuncios" className="data-[state=active]:bg-blue-50">
+                <TabsTrigger
+                  value="anuncios"
+                  className={`data-[state=active]:bg-blue-50 ${selectedAdSets.size === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  aria-disabled={selectedAdSets.size === 0}
+                >
                   Anuncios
                 </TabsTrigger>
               </TabsList>
