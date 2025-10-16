@@ -342,6 +342,22 @@ const Advertising = () => {
     setVistaActual("conjuntos");
   };
 
+  // Al cambiar la selección de campañas, limpiar selección de ad sets y
+  // recortar el caché de ad sets a solo esas campañas para evitar datos arrastrados
+  useEffect(() => {
+    setSelectedAdSets(new Set());
+    setAdSetsData((prev) => {
+      if (selectedCampaigns.size === 0) return new Map();
+      const next = new Map<string, MetaAdSet[]>();
+      for (const id of selectedCampaigns) {
+        const sets = prev.get(id) || [];
+        const filtered = sets.filter((s) => String(s.campaign_id) === String(id));
+        next.set(id, filtered);
+      }
+      return next;
+    });
+  }, [selectedCampaigns]);
+
   // Seleccionar/deseleccionar conjunto de anuncios
   const toggleAdSetSelection = (adSetId: string) => {
     const newSelected = new Set(selectedAdSets);
@@ -378,9 +394,11 @@ const Advertising = () => {
   }, [vistaActual, selectedCampaigns, adSetsData, datePreset, usingRealData]);
 
   // Obtener conjuntos de anuncios de campañas seleccionadas
-  const adSetsFromSelectedCampaigns = Array.from(selectedCampaigns).flatMap(
-    (campaignId) => adSetsData.get(campaignId) || []
-  );
+  const adSetsFromSelectedCampaigns = Array.from(selectedCampaigns).flatMap((campaignId) => {
+    const sets = adSetsData.get(campaignId) || [];
+    // Asegurar que solo entren ad sets de esa campaña
+    return sets.filter((s) => String(s.campaign_id) === String(campaignId));
+  });
 
   // Obtener anuncios de conjuntos seleccionados
   
