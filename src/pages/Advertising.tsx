@@ -63,6 +63,7 @@ interface MetaAd {
   id: string;
   name: string;
   status: "ACTIVE" | "PAUSED" | "DELETED" | "ARCHIVED";
+  adset_id?: string;
 }
 
 // Interfaz para campañas transformadas
@@ -232,7 +233,7 @@ const Advertising = () => {
   const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
   const [selectedAdSets, setSelectedAdSets] = useState<Set<string>>(new Set());
   const [adSetsData, setAdSetsData] = useState<Map<string, MetaAdSet[]>>(new Map());
-  const [adsData] = useState<Map<string, MetaAd[]>>(new Map());
+  const [adsData, setAdsData] = useState<Map<string, MetaAd[]>>(new Map());
   const [loadingAdSets, setLoadingAdSets] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [now, setNow] = useState<number>(Date.now());
@@ -434,9 +435,11 @@ const Advertising = () => {
     const a = tableScrollRef.current, b = topScrollRef.current;
     if (a && b && a.scrollLeft !== b.scrollLeft) a.scrollLeft = b.scrollLeft;
   };
-const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
-    (adSetId) => adsData.get(adSetId) || []
-  );
+const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap((adSetId) => {
+    const ads = adsData.get(adSetId) || [];
+    // Filtrar estrictamente por adset_id cuando exista
+    return ads.filter((ad) => !ad.adset_id || String(ad.adset_id) === String(adSetId));
+  });
 
   // Manejar cambio de estado de campaña
   const handleToggleCampaign = async (campaignId: string, currentStatus: "activa" | "pausada" | "finalizada") => {
@@ -728,8 +731,26 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
           </div>
 
           <div className="flex items-center justify-between">
-            {/* Vista selector */}
-            <Tabs value={vistaActual} onValueChange={(v) => setVistaActual(v as "campañas" | "conjuntos" | "anuncios")} className="w-auto">
+            {/* Vista selector con guardas */}
+            <Tabs
+              value={vistaActual}
+              onValueChange={(v) => {
+                const target = v as "campañas" | "conjuntos" | "anuncios";
+                if (target === "conjuntos" && selectedCampaigns.size === 0) {
+                  toast.info("Selecciona una campaña para ver sus conjuntos");
+                  setVistaActual("campañas");
+                  return;
+                }
+                if (target === "anuncios" && selectedAdSets.size === 0) {
+                  toast.info("Selecciona al menos un conjunto para ver sus anuncios");
+                  // Si hay una campaña, mandamos a conjuntos; si no, a campañas
+                  setVistaActual(selectedCampaigns.size > 0 ? "conjuntos" : "campañas");
+                  return;
+                }
+                setVistaActual(target);
+              }}
+              className="w-auto"
+            >
               <TabsList className="bg-white">
                 <TabsTrigger value="campañas" className="data-[state=active]:bg-blue-50">
                   Campañas
@@ -1048,23 +1069,23 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
               {vistaActual === "conjuntos" && (
                 <>
                   {(() => {
-                    if (loadingAdSets) {
-                      return (
-                        <TableRow>
-                          <TableCell colSpan={14} className="text-center py-12">
-                            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
-                            <p className="text-gray-700 font-medium">Cargando conjuntos de anuncios...</p>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    }
                     if (selectedCampaigns.size === 0) {
                       return (
                         <TableRow>
                           <TableCell colSpan={14} className="text-center py-12">
                             <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
                             <p className="text-gray-700 font-medium mb-2">Selecciona una campaña</p>
-                            <p className="text-gray-500 text-sm">Ve a la pestaña "Campañas" y selecciona al menos una campaña para ver sus conjuntos de anuncios</p>
+                            <p className="text-gray-500 text-sm">Ve a la pestaña "Campañas" y haz clic en el nombre para ver sus conjuntos</p>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    if (loadingAdSets) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={14} className="text-center py-12">
+                            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
+                            <p className="text-gray-700 font-medium">Cargando conjuntos de anuncios...</p>
                           </TableCell>
                         </TableRow>
                       );
