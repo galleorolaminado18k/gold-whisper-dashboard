@@ -9,11 +9,11 @@ const SELECTED_COLOR = "#10b981"
 interface ChartCardProps {
   title: string
   description: string
-  data: Array<{ name: string; value: number }>
+  data: ReadonlyArray<{ name: string; value: number; growth?: string; period?: string }>
   chartType: string
-  colors: string[]
+  colors: ReadonlyArray<string>
   isHovered: boolean
-  onHover: (chartType: string, index: number, segment: any, percentage: number) => void
+  onHover: (chartType: string, index: number, segment: { name: string; value: number }, percentage: number) => void
   onLeave: () => void
 }
 
@@ -40,9 +40,20 @@ export const ChartCard = memo(function ChartCard({
 
   const chartData = useMemo(() => Object.freeze(data), [data])
   const chartColors = useMemo(() => Object.freeze(colors), [colors])
+  // Recharts expects a mutable array, create a shallow mutable copy in the expected shape
+  const mutableChartData = useMemo(() => data.map(d => ({ name: d.name, value: d.value })), [data])
 
-  const renderActiveShape = useCallback((props: any) => {
-    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, payload, percent, value } = props
+  const renderActiveShape = useCallback((props: {
+    cx: number
+    cy: number
+    innerRadius: number
+    outerRadius: number
+    startAngle: number
+    endAngle: number
+    payload: { name: string }
+    value: number
+  }) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, payload, value } = props
 
     return (
       <g>
@@ -83,9 +94,9 @@ export const ChartCard = memo(function ChartCard({
   }, [])
 
   const handlePieEnter = useCallback(
-    (_: any, index: number) => {
+    (_: unknown, index: number) => {
       setLocalActiveIndex(index)
-      const segment = chartData[index]
+      const segment = chartData[index] as { name: string; value: number }
       const total = chartData.reduce((sum, item) => sum + item.value, 0)
       const percentage = (segment.value / total) * 100
       onHover(chartType, index, segment, percentage)
@@ -96,6 +107,29 @@ export const ChartCard = memo(function ChartCard({
   const handlePieLeave = useCallback(() => {
     onLeave()
   }, [onLeave])
+
+  const renderLabel = useCallback(
+    ({ cx, cy, midAngle, outerRadius, percent, index }: { cx: number; cy: number; midAngle: number; outerRadius: number; percent: number; index: number }) => {
+      const RADIAN = Math.PI / 180
+      const radius = outerRadius + 30
+      const x = cx + radius * Math.cos(-midAngle * RADIAN)
+      const y = cy + radius * Math.sin(-midAngle * RADIAN)
+
+      return (
+        <text
+          x={x}
+          y={y}
+          fill={chartColors[index % chartColors.length]}
+          textAnchor={x > cx ? "start" : "end"}
+          dominantBaseline="central"
+          className="text-sm font-semibold"
+        >
+          {`${(percent * 100).toFixed(1)}%`}
+        </text>
+      )
+    },
+    [chartColors],
+  )
 
   return (
     <Card
@@ -112,7 +146,7 @@ export const ChartCard = memo(function ChartCard({
             <Pie
               activeIndex={isHovered ? (localActiveIndex ?? undefined) : undefined}
               activeShape={renderActiveShape}
-              data={chartData}
+              data={mutableChartData}
               cx="50%"
               cy="50%"
               innerRadius={55}
@@ -122,25 +156,7 @@ export const ChartCard = memo(function ChartCard({
               onMouseLeave={handlePieLeave}
               isAnimationActive={false}
               animationDuration={0}
-              label={({ cx, cy, midAngle, outerRadius, percent, index: idx }) => {
-                const RADIAN = Math.PI / 180
-                const radius = outerRadius + 30
-                const x = cx + radius * Math.cos(-midAngle * RADIAN)
-                const y = cy + radius * Math.sin(-midAngle * RADIAN)
-
-                return (
-                  <text
-                    x={x}
-                    y={y}
-                    fill={chartColors[idx % chartColors.length]}
-                    textAnchor={x > cx ? "start" : "end"}
-                    dominantBaseline="central"
-                    className="text-sm font-semibold"
-                  >
-                    {`${(percent * 100).toFixed(1)}%`}
-                  </text>
-                )
-              }}
+              label={renderLabel}
               labelLine={false}
             >
               {chartData.map((entry, index) => (
