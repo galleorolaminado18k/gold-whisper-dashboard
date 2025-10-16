@@ -39,6 +39,7 @@ const cache = {
   campaigns: null as CacheEntry<Campaign[]> | null,
   adsets: null as CacheEntry<AdSet[]> | null,
   ads: null as CacheEntry<Ad[]> | null,
+  monthlySpend: null as CacheEntry<number> | null,
 };
 
 function isCacheValid<T>(entry: CacheEntry<T> | null): boolean {
@@ -90,6 +91,42 @@ export interface Ad {
   revenue: number;
   roas: number;
   cvr: number;
+}
+
+/**
+ * Fetch global monthly spend across all ad accounts (this_month)
+ */
+export async function fetchMonthlySpend(): Promise<number> {
+  if (isCacheValid(cache.monthlySpend)) {
+    return cache.monthlySpend!.data;
+  }
+
+  if (!ACCESS_TOKEN) return 0;
+
+  try {
+    const promises = AD_ACCOUNT_IDS.filter(Boolean).map(async (accountId) => {
+      try {
+        const token = getTokenForAccount(accountId);
+        const url = `${META_GRAPH_API_BASE}/act_${accountId}/insights?level=account&date_preset=this_month&fields=spend&access_token=${token}`;
+        const r = await fetch(url);
+        if (!r.ok) return 0;
+        const json = await r.json();
+        const row = json?.data?.[0];
+        const spend = row ? parseFloat(row.spend || '0') : 0;
+        return isFinite(spend) ? spend : 0;
+      } catch {
+        return 0;
+      }
+    });
+
+    const values = await Promise.all(promises);
+    const total = values.reduce((s, v) => s + (v || 0), 0);
+    cache.monthlySpend = { data: total, timestamp: Date.now() };
+    return total;
+  } catch (e) {
+    console.warn('fetchMonthlySpend failed:', e);
+    return 0;
+  }
 }
 
 /**

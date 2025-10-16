@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar, RefreshCw, Search, BarChart3, Download } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { fetchMetaCampaigns, fetchMetaAdSets, fetchMetaAds, clearCache, type Campaign, type AdSet, type Ad } from "@/services/metaAdsService"
+import { fetchMetaCampaigns, fetchMetaAdSets, fetchMetaAds, fetchMonthlySpend, clearCache, type Campaign, type AdSet, type Ad } from "@/services/metaAdsService"
 
 type TabType = "campaigns" | "adsets" | "ads"
 
@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [adsets, setAdsets] = useState<AdSet[]>([])
   const [ads, setAds] = useState<Ad[]>([])
   const [loading, setLoading] = useState(true)
+  const [monthlySpend, setMonthlySpend] = useState<number>(0)
 
   const { toast } = useToast()
 
@@ -32,15 +33,17 @@ export default function DashboardPage() {
     setLoading(true)
     try {
       console.log('🔄 Cargando datos desde Meta Ads API...')
-      const [campaignsData, adsetsData, adsData] = await Promise.all([
+      const [campaignsData, adsetsData, adsData, monthSpend] = await Promise.all([
         fetchMetaCampaigns(),
         fetchMetaAdSets(),
-        fetchMetaAds()
+        fetchMetaAds(),
+        fetchMonthlySpend()
       ])
       
       setCampaigns(campaignsData)
       setAdsets(adsetsData)
-      setAds(adsData)
+  setAds(adsData)
+  setMonthlySpend(monthSpend)
       
       console.log('✅ Datos cargados desde Meta API:', {
         campaigns: campaignsData.length,
@@ -225,9 +228,9 @@ export default function DashboardPage() {
           {/* Metrics - CALCULATED FROM REAL META DATA */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <MetricsCard
-              title="GASTO TOTAL"
-              value={loading ? "Cargando..." : `$${campaigns.reduce((sum, c) => sum + c.spent, 0).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
-              subtitle="+12.3% vs anterior"
+              title="GASTO DEL MES"
+              value={loading ? "Cargando..." : `$${monthlySpend.toLocaleString('es-CO', { maximumFractionDigits: 0 })}`}
+              subtitle="Este mes"
               trend="up"
               borderColor="border-l-blue-500"
             />
