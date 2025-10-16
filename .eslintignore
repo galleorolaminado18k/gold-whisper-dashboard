@@ -1,0 +1,13 @@
+# Ignore legacy duplicate project and generated folders
+gold-whisper-dashboard/
+
+# Optional: ignore experimental v0 components and client sandbox
+src/components/v0/
+src/client/
+
+# Build outputs
+node_modules/
+dist/
+
+# Supabase generated configs
+supabase/

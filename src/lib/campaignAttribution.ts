@@ -29,7 +29,9 @@ function extractUtmCampaign(text: string): string | null {
       const cid = params.get("campaign_id");
       if (cid && /^(\d{6,})$/.test(cid)) return `id:${cid}`;
     }
-  } catch {}
+  } catch (e) {
+    // ignore URL parsing failures
+  }
   return null;
 }
 

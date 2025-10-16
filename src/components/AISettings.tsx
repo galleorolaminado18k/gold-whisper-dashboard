@@ -25,14 +25,18 @@ export function AISettings() {
         const envVal = Number(import.meta.env.VITE_AI_CI_SCORE);
         if (Number.isFinite(envVal) && envVal > 0) setCiScore(envVal);
       }
-    } catch {}
+    } catch (e) {
+      // ignore localStorage errors (private mode/SSR)
+    }
   }, []);
 
   const handleSave = () => {
     saveAIConfig({ provider, model, apiKey });
     try {
       localStorage.setItem('ai_ci_score', String(ciScore));
-    } catch {}
+    } catch (e) {
+      // ignore storage errors
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

@@ -357,7 +357,23 @@ const Advertising = () => {
       }
       return next;
     });
+    // Limpiar anuncios al cambiar de campañas para evitar arrastre
+    setAdsData(new Map());
   }, [selectedCampaigns]);
+
+  // Al cambiar selección de ad sets, podar caché de anuncios a solo esos ad sets
+  useEffect(() => {
+    setAdsData((prev) => {
+      if (selectedAdSets.size === 0) return new Map();
+      const next = new Map<string, MetaAd[]>();
+      for (const id of selectedAdSets) {
+        const ads = prev.get(id) || [];
+        const filtered = ads.filter((ad) => !ad.adset_id || String(ad.adset_id) === String(id));
+        next.set(id, filtered);
+      }
+      return next;
+    });
+  }, [selectedAdSets]);
 
   // Seleccionar/deseleccionar conjunto de anuncios
   const toggleAdSetSelection = (adSetId: string) => {
@@ -437,11 +453,13 @@ const Advertising = () => {
     const a = tableScrollRef.current, b = topScrollRef.current;
     if (a && b && a.scrollLeft !== b.scrollLeft) a.scrollLeft = b.scrollLeft;
   };
-const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap((adSetId) => {
-    const ads = adsData.get(adSetId) || [];
-    // Filtrar estrictamente por adset_id cuando exista
-    return ads.filter((ad) => !ad.adset_id || String(ad.adset_id) === String(adSetId));
-  });
+const adsFromSelectedAdSets = selectedAdSets.size === 0
+  ? []
+  : Array.from(selectedAdSets).flatMap((adSetId) => {
+      const ads = adsData.get(adSetId) || [];
+      // Filtrar estrictamente por adset_id cuando exista
+      return ads.filter((ad) => !ad.adset_id || String(ad.adset_id) === String(adSetId));
+    });
 
   // Manejar cambio de estado de campaña
   const handleToggleCampaign = async (campaignId: string, currentStatus: "activa" | "pausada" | "finalizada") => {
@@ -988,13 +1006,20 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap((adSetId) => {
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <p
-                                  className="font-medium text-sm whitespace-nowrap cursor-pointer text-blue-700 hover:underline"
+                                <button
+                                  type="button"
+                                  className="font-medium text-sm whitespace-nowrap text-left cursor-pointer text-blue-700 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
                                   title="Click para ver conjuntos de anuncios"
                                   onClick={() => openAdSetsForCampaign(campaign.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      openAdSetsForCampaign(campaign.id);
+                                    }
+                                  }}
                                 >
                                   {campaign.nombre}
-                                </p>
+                                </button>
                               </TooltipTrigger>
                               <TooltipContent className="max-w-md">
                                 <p className="text-xs text-gray-700 break-words">{campaign.nombre}</p>

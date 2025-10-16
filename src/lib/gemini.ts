@@ -58,7 +58,9 @@ export function getAIScore(): number {
       const v = Number(stored);
       if (Number.isFinite(v) && v > 0) return v;
     }
-  } catch {}
+  } catch (e) {
+    // ignore localStorage access errors (e.g., SSR or privacy mode)
+  }
   const envVal = Number(import.meta.env.VITE_AI_CI_SCORE);
   if (Number.isFinite(envVal) && envVal > 0) return envVal;
   return 145; // Default solicitado
@@ -121,9 +123,10 @@ export async function analyzeWithGemini(prompt: string): Promise<string> {
       default:
         throw new Error(`Proveedor no soportado: ${config.provider}`);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error('Error en análisis IA:', error);
-    throw new Error(`Error: ${error.message}`);
+    throw new Error(`Error: ${msg}`);
   }
 }
 

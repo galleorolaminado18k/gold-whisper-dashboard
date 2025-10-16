@@ -1,4 +1,4 @@
-import { getAIScore } from "@/lib/gemini";
+import { getAIScore, analyzeWithGemini } from "@/lib/gemini";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
@@ -9,7 +9,6 @@ import { ChartCard } from "./chart-card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { analyzeWithGemini } from "@/lib/gemini"
 import type { Campaign } from "@/services/metaAdsService"
 
 const sectionBgColors = {
