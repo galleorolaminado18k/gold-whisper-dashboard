@@ -3,40 +3,26 @@
   <head>
     <meta charset="utf-8" />
     <title>Redirecting…</title>
-  <!-- Redirect logic for GitHub Pages project or custom domain -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script>
       (function () {
-        // If hosted under a custom domain with a CNAME, we point to root
-        // Otherwise, fallback to the project subpath
-        var basePath = (function(){
-          try {
-            // Injected by Vite at build-time if defined
-            var injected = import.meta && import.meta.env && import.meta.env.BASE_URL;
-            if (injected && injected !== '/') return injected.replace(/\/$/, '');
-          } catch(e) {
-            // Fallback: no BASE_URL in this context
-          }
-          // Heuristic: if domain is github.io, use the repo subpath; else root
-          var isGithub = /github\.io$/.test(location.host);
-          return isGithub ? '/gold-whisper-dashboard' : '';
-        })();
         try {
-          sessionStorage.setItem(
-            'redirectAfterReload',
-            location.pathname + location.search + location.hash
-          );
-        } catch (e) {
-          // Fallback: sessionStorage no disponible
+          // Guarda la ruta original para que el SPA la restaure al cargar
+          sessionStorage.setItem('redirectAfterReload', location.pathname + location.search + location.hash);
+        } catch (_) {}
+
+        // Si es github.io, redirige a /<repo>/, si no, a la raíz '/'
+        var isGithub = /github\.io$/i.test(location.host);
+        // Ajusta el nombre del repo si fuese necesario en forks; aquí usamos el actual
+        var repoBase = '/gold-whisper-dashboard';
+        var target = isGithub ? repoBase + '/' : '/';
+        // Forzar URL absoluta en github.io para evitar bases relativas
+        if (isGithub) {
+          target = location.protocol + '//' + location.host + target;
         }
-  var l = globalThis.location;
-        var target = (basePath || '') + '/';
-  if (l.origin && l.origin.includes('github.io')) {
-          // Ensure absolute URL to avoid mixed base issues
-          target = l.protocol + '//' + l.host + (basePath || '') + '/';
-        }
-        l.replace(target);
+        location.replace(target);
       })();
     </script>
   </head>
   <body>Redirecting…</body>
-  </html>
+</html>
