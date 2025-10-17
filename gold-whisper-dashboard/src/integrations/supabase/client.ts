@@ -2,30 +2,16 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-const DEFAULT_SUPABASE_URL = "https://evjgujiyjplvbudgfiwr.supabase.co";
-const SUPABASE_URL_RAW = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-  import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || "").toString();
+const SUPABASE_ANON_KEY = (
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? import.meta.env.VITE_SUPABASE_ANON_KEY ?? ""
+).toString();
 
-// Valida que la URL sea del formato correcto; si no, hace fallback
-const VALID_HOST = /^https:\/\/[a-z0-9]{20}\.supabase\.co$/;
-const SUPABASE_URL =
-  SUPABASE_URL_RAW && VALID_HOST.test(SUPABASE_URL_RAW)
-    ? SUPABASE_URL_RAW
-    : DEFAULT_SUPABASE_URL;
-
-if (SUPABASE_URL_RAW && !VALID_HOST.test(SUPABASE_URL_RAW)) {
-  // avisa en consola si había una URL inválida (typo de DNS)
-  console.warn(
-    `[Supabase] VITE_SUPABASE_URL inválida ('${SUPABASE_URL_RAW}'). Usando fallback '${DEFAULT_SUPABASE_URL}'.`
-  );
+if (!SUPABASE_URL || !/^https?:\/\//.test(SUPABASE_URL)) {
+  throw new Error("[Supabase] Missing or invalid VITE_SUPABASE_URL. Configure it in your .env");
 }
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error(
-    "[Supabase] Missing env vars: define VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY)."
-  );
+if (!SUPABASE_ANON_KEY) {
+  throw new Error("[Supabase] Missing VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY). Configure it in your .env");
 }
 
 // Import the supabase client like this:

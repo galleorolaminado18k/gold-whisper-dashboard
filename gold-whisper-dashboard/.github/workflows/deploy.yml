@@ -11,17 +11,24 @@ jobs:
     permissions:
       contents: write # Añadir permisos de escritura para el bot de GitHub Actions
     env:
-      VITE_SUPABASE_URL: https://evjgujiyjplvbudgfiwr.supabase.co
-      VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2amd1aml5anBsdmJ1ZGdmaXdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwOTc4NzIsImV4cCI6MjA3NTY3Mzg3Mn0.EnJIuzxjw6tpURxclEZ60ySDqKkz6vltjSQPEWHtYzI
-      # Para habilitar el widget de Chatwoot en producción, define los secretos
-      # en Settings > Secrets and variables > Actions del repositorio:
-      #   VITE_CHATWOOT_WEBSITE_TOKEN = <tu token del widget>
-      VITE_CHATWOOT_ENABLED: true
-      VITE_CHATWOOT_URL: https://app.chatwoot.com
-      VITE_CHATWOOT_WEBSITE_TOKEN: c5S9SqxkumtX7GAZdc9LQnri
+      # Base path for GitHub Pages project site
+      VITE_ASSET_BASE: /gold-whisper-dashboard/
+      VITE_ROUTER_BASENAME: /gold-whisper-dashboard
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      # Chatwoot
+      VITE_CHATWOOT_ENABLED: ${{ secrets.VITE_CHATWOOT_ENABLED }}
+      VITE_CHATWOOT_URL: ${{ secrets.VITE_CHATWOOT_URL }}
+      VITE_CHATWOOT_WEBSITE_TOKEN: ${{ secrets.VITE_CHATWOOT_WEBSITE_TOKEN }}
+      VITE_CHATWOOT_ACCOUNT_ID: ${{ secrets.VITE_CHATWOOT_ACCOUNT_ID }}
       # Bridge API (para CRM y envío de mensajes)
-      VITE_BRIDGE_API_URL: https://chatwoot-proxy-galle.galleorolaminado18k.workers.dev
-      VITE_CHATWOOT_ACCOUNT_ID: 138167
+      VITE_BRIDGE_API_URL: ${{ secrets.VITE_BRIDGE_API_URL }}
+      # Meta Ads
+      VITE_META_ACCESS_TOKEN: ${{ secrets.VITE_META_ACCESS_TOKEN }}
+      VITE_META_AD_ACCOUNT_ID: ${{ secrets.VITE_META_AD_ACCOUNT_ID }}
+      VITE_META_AD_ACCOUNT_IDS: ${{ secrets.VITE_META_AD_ACCOUNT_IDS }}
+      VITE_META_AD_ACCOUNT_NAMES: ${{ secrets.VITE_META_AD_ACCOUNT_NAMES }}
+      VITE_META_BUSINESS_ID: ${{ secrets.VITE_META_BUSINESS_ID }}
 
     steps:
       - name: Checkout 🛎️
@@ -66,4 +73,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           publish_branch: gh-pages
-          cname: dashboard.galle18k.com # Opcional: si tienes un dominio personalizado
+

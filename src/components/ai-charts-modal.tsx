@@ -8,11 +8,13 @@ import { ChartCard } from "./chart-card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import type { Campaign } from "@/services/metaAdsService"
 
 interface AIChartsModalProps {
   isOpen: boolean
   campaignId: string | null
   onClose: () => void
+  campaigns?: Campaign[]
 }
 
 const CONVERSION_COLORS = Object.freeze(["#ef4444", "#10b981"]) // Rojo, Verde
@@ -60,21 +62,8 @@ const CHARTS = [
   },
 ]
 
-const ACTIVE_CAMPAIGNS = [
-  { id: "120233445687010113", name: "Mensajes a WhatsApp del Mayo..." },
-  { id: "120232220411150113", name: "Campaña Balines - Mensajes a..." },
-  { id: "120230223507150113", name: "CÚCUTA - AGOSTO" },
-]
-
-export function AIChartsModal({
-  isOpen,
-  campaignId,
-  onClose,
-}: {
-  isOpen: boolean
-  campaignId: string | null
-  onClose: () => void
-}) {
+export function AIChartsModal(props: AIChartsModalProps) {
+  const { isOpen, campaignId, onClose, campaigns = [] } = props
   const [loading, setLoading] = useState(true)
   const [currentChartIndex, setCurrentChartIndex] = useState(0)
   const [hoveredChart, setHoveredChart] = useState<string | null>(null)
@@ -105,7 +94,23 @@ export function AIChartsModal({
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["negativo", "neutral", "positivo"]))
 
-  const [selectedCampaign, setSelectedCampaign] = useState(campaignId || ACTIVE_CAMPAIGNS[0].id)
+  const campaignsList = useMemo(() => {
+    return (campaigns || []).map((c) => ({ id: c.id, name: c.name }))
+  }, [campaigns])
+
+  const defaultCampaignId = useMemo(() => campaignsList[0]?.id || null, [campaignsList])
+  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(campaignId || defaultCampaignId)
+
+  useEffect(() => {
+    // keep selected id in sync when campaigns load
+    if (!selectedCampaign && defaultCampaignId) {
+      setSelectedCampaign(defaultCampaignId)
+    }
+  }, [defaultCampaignId, selectedCampaign])
+
+  const selectedCampaignData = useMemo(() => {
+    return (campaigns || []).find((c) => c.id === selectedCampaign) || null
+  }, [campaigns, selectedCampaign])
 
   const { toast } = useToast()
 
@@ -148,108 +153,96 @@ export function AIChartsModal({
     }
   }, [])
 
-  const conversionData = useMemo(
-    () =>
-      Object.freeze([
-        { name: "Conversiones", value: 45, growth: "+12%", period: "7d" },
-        { name: "Sin conversión", value: 55, growth: "-8%", period: "7d" },
-      ]),
-    [],
-  )
-  const spendData = useMemo(
-    () =>
-      Object.freeze([
-        { name: "Gastado", value: 58.5, growth: "+15%", period: "3d" },
-        { name: "Presupuesto restante", value: 41.5, growth: "-15%", period: "3d" },
-      ]),
-    [],
-  )
-  const roasData = useMemo(
-    () =>
-      Object.freeze([
-        { name: "ROAS Alto", value: 15, growth: "+5%", period: "15d" },
-        { name: "ROAS Medio", value: 35, growth: "+8%", period: "7d" },
-        { name: "ROAS Bajo", value: 50, growth: "-10%", period: "3d" },
-      ]),
-    [],
-  )
-  const cvrData = useMemo(
-    () =>
-      Object.freeze([
-        { name: "CVR Alto", value: 20, growth: "+18%", period: "15d" },
-        { name: "CVR Medio", value: 35, growth: "+5%", period: "7d" },
-        { name: "CVR Bajo", value: 45, growth: "-12%", period: "3d" },
-      ]),
-    [],
-  )
-  const gastadoData = useMemo(
-    () =>
-      Object.freeze([
-        { name: "Gastado", value: 58.5, growth: "+15%", period: "3d" },
-        { name: "Presupuesto restante", value: 41.5, growth: "-15%", period: "3d" },
-      ]),
-    [],
-  )
-  const costPerConvData = useMemo(
-    () =>
-      Object.freeze([
-        { name: "Costo óptimo", value: 25, growth: "+10%", period: "15d" },
-        { name: "Costo alto", value: 45, growth: "+3%", period: "7d" },
-        { name: "Costo excesivo", value: 30, growth: "-8%", period: "3d" },
-      ]),
-    [],
-  )
-  const ventasData = useMemo(
-    () =>
-      Object.freeze([
-        { name: "Ventas completadas", value: 27, growth: "+22%", period: "15d" },
-        { name: "Ventas pendientes", value: 18, growth: "+5%", period: "7d" },
-        { name: "Ventas perdidas", value: 55, growth: "-15%", period: "3d" },
-      ]),
-    [],
-  )
-  const ingresosData = useMemo(
-    () =>
-      Object.freeze([
-        { name: "Ingresos generados", value: 31.4, growth: "+18%", period: "15d" },
-        { name: "Ingresos proyectados", value: 68.6, growth: "+12%", period: "7d" },
-      ]),
+  // Helpers
+  const clampPct = (v: number) => Math.max(0, Math.min(100, Number.isFinite(v) ? v : 0))
+  const safe = (n: number) => (Number.isFinite(n) ? n : 0)
+
+  const computeTwoSlice = useCallback(
+    (labelA: string, pctA: number, labelB: string): Array<{ name: string; value: number; period?: string }> => {
+      const a = clampPct(pctA)
+      const b = clampPct(100 - a)
+      return [
+        { name: labelA, value: Number(a.toFixed(1)), period: "30d" },
+        { name: labelB, value: Number(b.toFixed(1)), period: "30d" },
+      ]
+    },
     [],
   )
 
+  const getBudgetTotal = useCallback(() => {
+    const c = selectedCampaignData
+    if (!c) return 0
+    const lifetime = safe(c.lifetime_budget || 0)
+    const daily = safe(c.daily_budget || 0)
+    if (lifetime > 0) return lifetime
+    if (daily > 0) return daily * 30
+    return 0
+  }, [selectedCampaignData])
+
   const getCurrentChartData = useCallback(() => {
+    const c = selectedCampaignData
     const chartId = CHARTS[currentChartIndex].id
-    switch (chartId) {
-      case "conversions":
-        return conversionData
-      case "budget":
-        return spendData
-      case "roas":
-        return roasData
-      case "cvr":
-        return cvrData
-      case "gastado":
-        return gastadoData
-      case "costPerConv":
-        return costPerConvData
-      case "ventas":
-        return ventasData
-      case "ingresos":
-        return ingresosData
-      default:
-        return conversionData
+
+    if (!c) {
+      // Fallback neutral dataset
+      return computeTwoSlice("Sin datos", 0, "Pendiente")
     }
-  }, [
-    currentChartIndex,
-    conversionData,
-    spendData,
-    roasData,
-    cvrData,
-    gastadoData,
-    costPerConvData,
-    ventasData,
-    ingresosData,
-  ])
+
+    switch (chartId) {
+      case "conversions": {
+        // Usamos CVR (ventas / conversaciones) como % de conversión
+        const cvrPct = clampPct(safe(c.cvr))
+        return computeTwoSlice("Conversión a venta", cvrPct, "No convierten")
+      }
+      case "budget": {
+        const budgetTotal = getBudgetTotal()
+        if (budgetTotal > 0) {
+          const spentPct = clampPct((safe(c.spent) / budgetTotal) * 100)
+          return computeTwoSlice("Gastado", spentPct, "Presupuesto restante")
+        }
+        // Sin presupuesto definido
+        return computeTwoSlice("Gastado", 100, "Presupuesto restante")
+      }
+      case "roas": {
+        const target = 3 // objetivo 3x
+        const achieved = clampPct((safe(c.roas) / target) * 100)
+        return computeTwoSlice("ROAS alcanzado", achieved, "Falta para 3x")
+      }
+      case "cvr": {
+        const target = 20 // objetivo 20%
+        const achieved = clampPct((safe(c.cvr) / target) * 100)
+        return computeTwoSlice("CVR alcanzado", achieved, "Falta para 20%")
+      }
+      case "gastado": {
+        const budgetTotal = getBudgetTotal()
+        if (budgetTotal > 0) {
+          const spentPct = clampPct((safe(c.spent) / budgetTotal) * 100)
+          return computeTwoSlice("Gasto ejecutado", spentPct, "Por ejecutar")
+        }
+        return computeTwoSlice("Gasto ejecutado", 100, "Por ejecutar")
+      }
+      case "costPerConv": {
+        const target = 15000 // COP objetivo
+        const cost = safe(c.conversations) > 0 ? safe(c.spent) / safe(c.conversations) : Infinity
+        const achieved = !isFinite(cost) ? 0 : cost <= target ? 100 : clampPct((target / cost) * 100)
+        return computeTwoSlice("Dentro de objetivo", achieved, "Sobre objetivo")
+      }
+      case "ventas": {
+        const rate = safe(c.conversations) > 0 ? (safe(c.sales) / safe(c.conversations)) * 100 : 0
+        return computeTwoSlice("Ventas confirmadas", clampPct(rate), "No compran tras chat")
+      }
+      case "ingresos": {
+        const spent = safe(c.spent)
+        const revenue = safe(c.revenue)
+        const achieved = spent <= 0 ? (revenue > 0 ? 100 : 0) : clampPct((revenue / spent) * 100)
+        return computeTwoSlice("Cubre gasto (breakeven)", achieved, "Falta por cubrir")
+      }
+      default:
+        return computeTwoSlice("Dato", 50, "Resto")
+    }
+  }, [currentChartIndex, selectedCampaignData, computeTwoSlice, getBudgetTotal])
+
+  // getCurrentChartData implemented above using real campaign data
 
   const getCurrentChartColors = useCallback(() => {
     const chartId = CHARTS[currentChartIndex].id
@@ -259,17 +252,17 @@ export function AIChartsModal({
       case "budget":
         return BUDGET_COLORS
       case "roas":
-        return ROAS_COLORS
+        return ["#10b981", "#ef4444"]
       case "cvr":
-        return CVR_COLORS
+        return ["#10b981", "#f59e0b"]
       case "gastado":
         return GASTADO_COLORS
       case "costPerConv":
-        return COST_PER_CONV_COLORS
+        return ["#10b981", "#ef4444"]
       case "ventas":
-        return VENTAS_COLORS
+        return ["#10b981", "#ef4444"]
       case "ingresos":
-        return INGRESOS_COLORS
+        return ["#10b981", "#ef4444"]
       default:
         return CONVERSION_COLORS
     }
@@ -289,22 +282,23 @@ export function AIChartsModal({
   }
 
   const getLossAmount = useCallback(() => {
+    const c = selectedCampaignData
     const chartType = CHARTS[currentChartIndex].id
-    if (chartType === "conversions") {
-      return "45 conversiones"
-    } else if (chartType === "roas") {
-      return formatCOP(26000)
-    } else if (chartType === "cvr") {
-      return "334 conversiones"
+    if (!c) return formatCOP(0)
+    if (chartType === "roas" || chartType === "ingresos") {
+      const loss = Math.max(0, safe(c.spent) - safe(c.revenue))
+      return formatCOP(loss)
+    } else if (chartType === "conversions" || chartType === "cvr" || chartType === "ventas") {
+      const missed = Math.max(0, safe(c.conversations) - safe(c.sales))
+      return `${missed} ventas perdidas`
     } else if (chartType === "costPerConv") {
-      return formatCOP(26000)
-    } else if (chartType === "ventas") {
-      return "45 ventas"
-    } else if (chartType === "ingresos") {
-      return formatCOP(26000)
+      const target = 15000
+      const cost = safe(c.conversations) > 0 ? safe(c.spent) / safe(c.conversations) : 0
+      const over = Math.max(0, cost - target) * safe(c.conversations)
+      return formatCOP(over)
     }
-    return formatCOP(26000)
-  }, [currentChartIndex])
+    return formatCOP(0)
+  }, [currentChartIndex, selectedCampaignData])
 
   const getChartPercentages = useCallback(() => {
     const data = getCurrentChartData()
@@ -1222,7 +1216,7 @@ Tu ingreso actual es de $1,099 COP, lo que está por encima del benchmark de la 
                 {
                   label: "Campaña Analizada",
                   value:
-                    ACTIVE_CAMPAIGNS.find((c) => c.id === selectedCampaign)?.name.substring(0, 20) + "..." || "N/A",
+                    (campaignsList.find((c) => c.id === selectedCampaign)?.name || selectedCampaignData?.name || "N/A").substring(0, 20) + "...",
                   trend: "",
                 },
                 { label: "Gasto Acumulado", value: formatCOP(26000), trend: "+12%" },
@@ -1374,7 +1368,7 @@ Tu ingreso actual es de $1,099 COP, lo que está por encima del benchmark de la 
                 {
                   label: "Campaña Analizada",
                   value:
-                    ACTIVE_CAMPAIGNS.find((c) => c.id === selectedCampaign)?.name.substring(0, 20) + "..." || "N/A",
+                    (campaignsList.find((c) => c.id === selectedCampaign)?.name || selectedCampaignData?.name || "N/A").substring(0, 20) + "...",
                   trend: "",
                 },
                 { label: "Gasto Acumulado", value: "$28k", trend: "+8%" },
@@ -1529,7 +1523,7 @@ Tu ingreso actual es de $1,099 COP, lo que está por encima del benchmark de la 
                 {
                   label: "Campaña Analizada",
                   value:
-                    ACTIVE_CAMPAIGNS.find((c) => c.id === selectedCampaign)?.name.substring(0, 20) + "..." || "N/A",
+                    (campaignsList.find((c) => c.id === selectedCampaign)?.name || selectedCampaignData?.name || "N/A").substring(0, 20) + "...",
                   trend: "",
                 },
                 { label: "Gasto Acumulado", value: "$18k", trend: "+25%" },
@@ -1687,7 +1681,7 @@ Tu ingreso actual es de $1,099 COP, lo que está por encima del benchmark de la 
       const insightsData = getInsightsContent()
       let exportContent = `REPORTE DE INSIGHTS - ${insightsData.title}\n`
       exportContent += `Generado: ${new Date().toLocaleString("es-CO")}\n`
-      exportContent += `Campaña: ${ACTIVE_CAMPAIGNS.find((c) => c.id === selectedCampaign)?.name || "N/A"}\n`
+  exportContent += `Campaña: ${campaignsList.find((c) => c.id === selectedCampaign)?.name || selectedCampaignData?.name || "N/A"}\n`
       exportContent += `\n${"=".repeat(80)}\n\n`
 
       insightsData.content.forEach((section) => {
@@ -1767,12 +1761,12 @@ Tu ingreso actual es de $1,099 COP, lo que está por encima del benchmark de la 
             </div>
             <div className="flex items-center gap-2">
               {/* Added campaign selector */}
-              <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+              <Select value={selectedCampaign ?? undefined} onValueChange={setSelectedCampaign}>
                 <SelectTrigger className="w-[220px] bg-gray-100 border-gray-300 text-gray-700 text-[11px] font-medium h-8 px-3 rounded-lg">
                   <SelectValue placeholder="Selecciona una campaña..." />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-gray-200">
-                  {ACTIVE_CAMPAIGNS.map((campaign) => (
+                  {campaignsList.map((campaign) => (
                     <SelectItem key={campaign.id} value={campaign.id} className="text-[11px] py-1.5">
                       {campaign.name}
                     </SelectItem>
@@ -1963,12 +1957,12 @@ Tu ingreso actual es de $1,099 COP, lo que está por encima del benchmark de la 
                           </div>
 
                           <div className="mt-2">
-                            <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+                            <Select value={selectedCampaign ?? undefined} onValueChange={setSelectedCampaign}>
                               <SelectTrigger className="w-full h-8 text-xs bg-white border-gray-300">
                                 <SelectValue placeholder="Seleccionar campaña" />
                               </SelectTrigger>
                               <SelectContent>
-                                {ACTIVE_CAMPAIGNS.map((campaign) => (
+                                {campaignsList.map((campaign) => (
                                   <SelectItem key={campaign.id} value={campaign.id} className="text-xs">
                                     {campaign.name}
                                   </SelectItem>

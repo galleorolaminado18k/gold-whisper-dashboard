@@ -11,12 +11,14 @@
       "VITE_CHATWOOT_USER_TOKEN": "@vite_chatwoot_user_token",
       "VITE_META_BUSINESS_ID": "@vite_meta_business_id",
       "VITE_META_ACCESS_TOKEN": "@vite_meta_access_token",
+  "VITE_META_ACCESS_TOKEN_2": "@vite_meta_access_token_2",
       "VITE_META_AD_ACCOUNT_IDS": "@vite_meta_ad_account_ids",
       "VITE_META_AD_ACCOUNT_NAMES": "@vite_meta_ad_account_names",
       "VITE_META_AD_ACCOUNT_ID": "@vite_meta_ad_account_id",
       "VITE_META_AD_ACCOUNT_NAME": "@vite_meta_ad_account_name",
       "VITE_CHATWOOT_ENABLED": "@vite_chatwoot_enabled",
-      "VITE_CHATWOOT_WEBSITE_TOKEN": "@vite_chatwoot_website_token"
+      "VITE_CHATWOOT_WEBSITE_TOKEN": "@vite_chatwoot_website_token",
+      "VITE_BRIDGE_API_URL": "@vite_bridge_api_url"
     }
   }
 }
