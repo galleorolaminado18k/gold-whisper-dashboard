@@ -13,8 +13,8 @@ jobs:
       contents: write
     env:
       # Base path for GitHub Pages project site
-      VITE_ASSET_BASE: /gold-whisper-dashboard/
-      VITE_ROUTER_BASENAME: /gold-whisper-dashboard
+      VITE_ASSET_BASE: ./
+      VITE_ROUTER_BASENAME: ""
       # App Secrets (configure in repo Settings > Secrets and variables > Actions)
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -62,3 +62,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           publish_branch: gh-pages
+          cname: dashboard.galle18k.com
