@@ -1,9 +1,16 @@
-name: Deploy to GitHub Pages
+name: Build and deploy (Pages)
 
 on:
   push:
     branches:
       - main
+      - 'feat/**'
+      - 'fix/**'
+      - 'chore/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -69,13 +76,23 @@ jobs:
           echo "--- Content of node_modules/rollup/dist/es/shared/parseAsset.js ---"
           cat node_modules/rollup/dist/es/shared/parseAsset.js || echo "File not found or cannot be read."
 
+      - name: Crear archivo nonce para invalidar caché
+        run: |
+          echo "BUILD_TIMESTAMP=$(date +%s)" > ./public/build-version.txt
+          echo "COMMIT_SHA=$GITHUB_SHA" >> ./public/build-version.txt
+          echo "BRANCH=$GITHUB_REF_NAME" >> ./public/build-version.txt
+          echo "Archivo de versión creado para invalidar caché"
+          cat ./public/build-version.txt
+
       - name: Build project
         run: npm run build
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages (main o rama feature específica)
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/ci-145-and-adsets-click-nav'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           publish_branch: gh-pages
           cname: dashboard.galle18k.com # Opcional: si tienes un dominio personalizado
+          force_orphan: true # Forzar reescritura completa para invalidar caché

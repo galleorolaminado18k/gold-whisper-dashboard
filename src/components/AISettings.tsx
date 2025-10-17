@@ -8,6 +8,7 @@ export function AISettings() {
   const [model, setModel] = useState('gemini-2.0-flash-exp');
   const [apiKey, setApiKey] = useState('');
   const [saved, setSaved] = useState(false);
+  const [ciScore, setCiScore] = useState<number>(145);
 
   // Cargar configuración al montar
   useEffect(() => {
@@ -15,10 +16,27 @@ export function AISettings() {
     setProvider(config.provider);
     setModel(config.model);
     setApiKey(config.apiKey);
+    try {
+      const stored = localStorage.getItem('ai_ci_score');
+      if (stored) {
+        const v = Number(stored);
+        if (Number.isFinite(v) && v > 0) setCiScore(v);
+      } else {
+        const envVal = Number(import.meta.env.VITE_AI_CI_SCORE);
+        if (Number.isFinite(envVal) && envVal > 0) setCiScore(envVal);
+      }
+    } catch (e) {
+      // ignore localStorage errors (private mode/SSR)
+    }
   }, []);
 
   const handleSave = () => {
     saveAIConfig({ provider, model, apiKey });
+    try {
+      localStorage.setItem('ai_ci_score', String(ciScore));
+    } catch (e) {
+      // ignore storage errors
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -125,6 +143,25 @@ export function AISettings() {
               <ExternalLink className="w-3 h-3" />
               Obtener API key
             </a>
+          </div>
+
+          {/* CI Score selector */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Coeficiente Intelectual (CI) deseado
+            </label>
+            <select
+              value={ciScore}
+              onChange={(e) => setCiScore(Number(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            >
+              <option value={130}>130 — Analítico y claro</option>
+              <option value={145}>145 — Rigor alto (recomendado)</option>
+              <option value={160}>160 — Máxima precisión</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Afecta el tono y estructura del razonamiento en insights y gráficos (más riguroso y cuantitativo a mayor CI).
+            </p>
           </div>
 
           {/* Save button */}

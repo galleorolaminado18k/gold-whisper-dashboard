@@ -1,0 +1,25 @@
+# Configuración para manejo de finales de línea
+* text=auto
+
+# Forzar normalización de finales de línea para archivos de texto
+*.ts text
+*.tsx text
+*.js text
+*.jsx text
+*.json text
+*.md text
+*.css text
+*.html text
+*.yml text
+*.yaml text
+
+# Asegurar que scripts y archivos de shell mantengan finales de línea LF
+*.sh text eol=lf
+
+# Archivos binarios que no deben ser modificados
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary

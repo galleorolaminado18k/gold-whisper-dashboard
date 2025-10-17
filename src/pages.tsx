@@ -345,6 +345,7 @@ export default function DashboardPage() {
         <AIChartsModal
           isOpen={showAICharts}
           campaignId={selectedCampaign}
+          campaigns={campaigns}
           onClose={() => {
             setShowAICharts(false)
             setSelectedCampaign(null)

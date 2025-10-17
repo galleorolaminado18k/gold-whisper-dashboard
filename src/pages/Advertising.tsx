@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,17 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { 
   Search,
-  Plus,
-  Copy,
   Edit,
-  MoreHorizontal,
   Download,
   BarChart3,
   Filter,
   Calendar,
   Settings2,
   TrendingUp,
-  TrendingDown,
   AlertCircle,
   CheckCircle2,
   XCircle,
@@ -29,17 +25,10 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  ChevronRight,
-  ChevronDown,
   Folder,
-  FolderOpen,
-  GripVertical
+  X
 } from "lucide-react";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
+// Resizable imports not used here
 import {
   Select,
   SelectContent,
@@ -53,7 +42,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { HelpCircle } from "lucide-react";
 import { 
   fetchAllAccountsCampaigns, 
   MetaCampaign, 
@@ -69,11 +57,13 @@ import { fetchConversationsByLabel, fetchMessages } from "@/lib/chatwoot";
 import classifyStage from "@/lib/classifier";
 import { getCategoryLabelForMessages } from "@/lib/campaignAttribution";
 import { getTotalsByCampaignFromSupabase } from "@/lib/sales";
+import { getAIScore } from "@/lib/gemini";
 
 interface MetaAd {
   id: string;
   name: string;
   status: "ACTIVE" | "PAUSED" | "DELETED" | "ARCHIVED";
+  adset_id?: string;
 }
 
 // Interfaz para campañas transformadas
@@ -101,11 +91,19 @@ interface CampaignData {
 // Limite de caracteres visibles para nombres largos en tabla
 const NAME_MAX = 28;
 const clampName = (s: string) => (s && s.length > NAME_MAX ? s.slice(0, NAME_MAX) + "..." : s);
+
+function SortIcon({ field, activeField, direction }: Readonly<{ field: keyof CampaignData; activeField: keyof CampaignData | null; direction: 'asc' | 'desc' }>) {
+  if (activeField !== field) return <ArrowUpDown className="w-4 h-4 text-gray-400" />;
+  return direction === 'asc' ? (
+    <ArrowUp className="w-4 h-4 text-blue-600" />
+  ) : (
+    <ArrowDown className="w-4 h-4 text-blue-600" />
+  );
+}
 // Función para transformar datos de Meta a formato de vista
 function transformMetaCampaign(metaCampaign: MetaCampaign): CampaignData {
   const insights = metaCampaign.insights;
   const gastado = insights?.spend || 0;
-  const clicks = insights?.clicks || 0;
   const impresiones = insights?.impressions || 0;
   
   // Estimaciones basadas en datos reales
@@ -125,12 +123,12 @@ function transformMetaCampaign(metaCampaign: MetaCampaign): CampaignData {
   const isReallyActive = metaCampaign.effective_status === 'ACTIVE';
   
   // Presupuesto: usa nivel campaña si existe; se ajustará luego con ad sets si falta
-  const budgetCampaign =
-    (typeof metaCampaign.daily_budget === 'number' && metaCampaign.daily_budget > 0
-      ? metaCampaign.daily_budget / 100
-      : (typeof metaCampaign.lifetime_budget === 'number' && metaCampaign.lifetime_budget > 0
-        ? metaCampaign.lifetime_budget / 100
-        : 0));
+  let budgetCampaign = 0;
+  if (typeof metaCampaign.daily_budget === 'number' && metaCampaign.daily_budget > 0) {
+    budgetCampaign = metaCampaign.daily_budget / 100;
+  } else if (typeof metaCampaign.lifetime_budget === 'number' && metaCampaign.lifetime_budget > 0) {
+    budgetCampaign = metaCampaign.lifetime_budget / 100;
+  }
 
   return {
     id: metaCampaign.id,
@@ -151,6 +149,66 @@ function transformMetaCampaign(metaCampaign: MetaCampaign): CampaignData {
     cpc: insights?.cpc || 0,
     account_name: metaCampaign.account_name,
   };
+}
+
+// Helper: enrich one campaign with CRM conversations, sales estimate, and optional DB totals
+async function enrichCampaignWithCRMAndSales(c: CampaignData, datePreset: string): Promise<CampaignData> {
+  try {
+    const label = `campaign:${c.id}`;
+    const convs = await fetchConversationsByLabel(label);
+    let conversaciones = Array.isArray(convs) ? convs.length : 0;
+
+    if (conversaciones === 0) {
+      try {
+        const convData = await fetchCampaignConversions(c.id, datePreset).catch(() => null);
+        const actions: Array<{ action_type?: string; value?: string | number }> =
+          (convData && (convData.actions as Array<{ action_type?: string; value?: string | number }>)) || [];
+        const msgAction = (actions || []).find(
+          (a) => typeof a?.action_type === 'string' && String(a.action_type).includes('messaging')
+        );
+        const v = msgAction?.value;
+        const n = Number(v);
+        if (Number.isFinite(n)) conversaciones = n;
+      } catch {
+        // silent; keep conversaciones as-is
+      }
+    }
+
+    // Count sales and estimate ingresos by product category
+    let ventas = 0;
+    let ingresosEstimado = 0;
+    const AOV_DEFAULT = Number(import.meta.env.VITE_DEFAULT_AOV) || 285000;
+    const AOV_BAL = Number(import.meta.env.VITE_AOV_BALINERIA) || AOV_DEFAULT;
+    const AOV_JOY = Number(import.meta.env.VITE_AOV_JOYERIA) || AOV_DEFAULT;
+    for (const conv of convs) {
+      const msgs = await fetchMessages(conv.id).catch(() => []);
+      const stage = classifyStage(msgs);
+      if (stage === "pedido_completo") {
+        ventas++;
+        const cat = getCategoryLabelForMessages(msgs);
+        if (cat === 'category:balineria') ingresosEstimado += AOV_BAL;
+        else if (cat === 'category:joyeria') ingresosEstimado += AOV_JOY;
+        else ingresosEstimado += AOV_DEFAULT;
+      }
+    }
+
+    // Try real ingresos from DB
+    let ingresos = ingresosEstimado;
+    try {
+      const db = await getTotalsByCampaignFromSupabase(c.id);
+      if (db && typeof db.ingresos === 'number' && db.ingresos > 0) ingresos = db.ingresos;
+    } catch {
+      // ignore
+    }
+
+    const gastado = c.gastado || 0;
+    const costePorConv = conversaciones > 0 ? gastado / conversaciones : 0;
+    const roas = gastado > 0 ? ingresos / gastado : 0;
+    const cvr = conversaciones > 0 ? (ventas / conversaciones) * 100 : 0;
+    return { ...c, conversaciones, ventas, ingresos, costePorConv, roas, cvr } as CampaignData;
+  } catch {
+    return c;
+  }
 }
 
 // Datos de ejemplo SOLO para fallback si la API falla
@@ -177,15 +235,14 @@ const Advertising = () => {
   const [adSetsData, setAdSetsData] = useState<Map<string, MetaAdSet[]>>(new Map());
   const [adsData, setAdsData] = useState<Map<string, MetaAd[]>>(new Map());
   const [loadingAdSets, setLoadingAdSets] = useState(false);
-  const [loadingAds, setLoadingAds] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [, forceUpdate] = useState(0); // Para forzar re-render del contador de tiempo
+  const [now, setNow] = useState<number>(Date.now());
 
   // Guardar campañas originales de Meta para poder actualizar su estado
   const [originalMetaCampaigns, setOriginalMetaCampaigns] = useState<MetaCampaign[]>([]);
 
   // Cargar datos reales de Meta Ads (ambas cuentas)
-  const loadRealData = async () => {
+  const loadRealData = React.useCallback(async () => {
     setLoading(true);
     try {
       console.log('🔄 Iniciando carga de datos desde Meta Ads...');
@@ -215,80 +272,7 @@ const Advertising = () => {
         );
 
         // Enriquecer con datos del CRM (conversaciones y ventas por campaña) usando etiquetas
-        const enriched = await Promise.all(
-          withBudgets.map(async (c) => {
-            try {
-              console.log(`🔍 Enriqueciendo campaña: ${c.nombre} (ID: ${c.id})`);
-              const label = `campaign:${c.id}`;
-              const convs = await fetchConversationsByLabel(label);
-              let conversaciones = Array.isArray(convs) ? convs.length : 0;
-              console.log(`  💬 Conversaciones encontradas desde CRM: ${conversaciones}`);
-
-              // Fallback: si no hay etiquetas aún, usa Meta 'actions' de mensajería como proxy
-              if (conversaciones === 0) {
-                try {
-                  const convData = await fetchCampaignConversions(c.id, datePreset).catch((error) => {
-                    console.error(`Error fetching conversions for campaign ${c.id}:`, error);
-                    return null;
-                  });
-                  const actions: Array<{ action_type?: string; value?: string | number }> =
-                    (convData && (convData.actions as Array<{ action_type?: string; value?: string | number }>)) || [];
-                  const msgAction = (actions || []).find(
-                    (a) => typeof a?.action_type === 'string' && String(a.action_type).includes('messaging')
-                  );
-                  const v = msgAction && (msgAction.value as string | number);
-                  const n = Number(v);
-                  if (Number.isFinite(n)) conversaciones = n;
-                } catch (error) {
-                  console.error(`Error in fallback for conversations for campaign ${c.id}:`, error);
-                }
-              }
-
-              // Contar ventas (conversaciones en etapa 'pedido_completo') vía clasificador
-              // Contar ventas y estimar ingresos por categoría si no hay BD
-              let ventas = 0;
-              let ingresosEstimado = 0;
-              const AOV_DEFAULT = Number(import.meta.env.VITE_DEFAULT_AOV) || 285000;
-              const AOV_BAL = Number(import.meta.env.VITE_AOV_BALINERIA) || AOV_DEFAULT;
-              const AOV_JOY = Number(import.meta.env.VITE_AOV_JOYERIA) || AOV_DEFAULT;
-              for (const conv of convs) {
-                const msgs = await fetchMessages(conv.id).catch((error) => {
-                  console.error(`Error fetching messages for conversation ${conv.id}:`, error);
-                  return [];
-                });
-                const stage = classifyStage(msgs);
-                if (stage === "pedido_completo") {
-                  ventas++;
-                  const cat = getCategoryLabelForMessages(msgs);
-                  if (cat === 'category:balineria') ingresosEstimado += AOV_BAL;
-                  else if (cat === 'category:joyeria') ingresosEstimado += AOV_JOY;
-                  else ingresosEstimado += AOV_DEFAULT;
-                }
-              }
-
-              // Intento de ingresos reales desde Supabase (si existe orders)
-              let ingresos = ingresosEstimado;
-              try {
-                const db = await getTotalsByCampaignFromSupabase(c.id);
-                if (db && typeof db.ingresos === 'number' && db.ingresos > 0) ingresos = db.ingresos;
-                console.log(`  💰 Ingresos desde Supabase: ${ingresos}`);
-              } catch (error) {
-                console.error(`Error fetching Supabase totals for campaign ${c.id}:`, error);
-              }
-
-              const gastado = c.gastado || 0;
-              const costePorConv = conversaciones > 0 ? gastado / conversaciones : 0;
-              const roas = gastado > 0 ? ingresos / gastado : 0;
-              const cvr = conversaciones > 0 ? (ventas / conversaciones) * 100 : 0; // CVR = Ventas / Conversaciones (según solicitud del usuario)
-
-              console.log(`  📊 Métricas finales - Gastado: $${gastado}, Conv: ${conversaciones}, Ventas: ${ventas}, Ingresos: $${ingresos}, ROAS: ${roas.toFixed(2)}x, CVR: ${cvr.toFixed(2)}%`);
-              return { ...c, conversaciones, ventas, ingresos, costePorConv, roas, cvr } as CampaignData;
-            } catch (error) {
-              console.error(`Error enriching campaign ${c.id} with CRM/Supabase data:`, error);
-              return c;
-            }
-          })
-        );
+        const enriched = await Promise.all(withBudgets.map((c) => enrichCampaignWithCRMAndSales(c, datePreset)));
 
         setCampaigns(enriched);
         setUsingRealData(true);
@@ -314,33 +298,26 @@ const Advertising = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [datePreset]);
 
   // Cargar datos reales al montar el componente
   useEffect(() => {
     loadRealData();
-    
     // Auto-actualizar cada 30 segundos para datos en tiempo real
     const interval = setInterval(() => {
       loadRealData();
-    }, 30 * 1000); // 30 segundos
-    
+    }, 30 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loadRealData]);
 
-  // Recargar cuando cambie el período
-  useEffect(() => {
-    loadRealData();
-  }, [datePreset]);
+  // loadRealData already depends on datePreset
 
   // Actualizar el contador de "hace X segundos" cada segundo
   useEffect(() => {
     if (!lastUpdated) return;
-    
     const timer = setInterval(() => {
-      forceUpdate(prev => prev + 1);
+      setNow(Date.now());
     }, 1000);
-    
     return () => clearInterval(timer);
   }, [lastUpdated]);
 
@@ -353,7 +330,50 @@ const Advertising = () => {
       newSelected.add(campaignId);
     }
     setSelectedCampaigns(newSelected);
+    // Nota: Ya no auto-navegamos. Solo navegar al hacer clic en el nombre de la campaña.
+    // Si no hay ninguna seleccionada y estamos en vistas profundas, regresar a campañas
+    if (newSelected.size === 0 && vistaActual !== "campañas") {
+      setVistaActual("campañas");
+    }
   };
+
+  // Abrir la vista de Conjuntos solo cuando se cliquee la campaña
+  const openAdSetsForCampaign = (campaignId: string) => {
+    setSelectedCampaigns(new Set([campaignId]));
+    setVistaActual("conjuntos");
+  };
+
+  // Al cambiar la selección de campañas, limpiar selección de ad sets y
+  // recortar el caché de ad sets a solo esas campañas para evitar datos arrastrados
+  useEffect(() => {
+    setSelectedAdSets(new Set());
+    setAdSetsData((prev) => {
+      if (selectedCampaigns.size === 0) return new Map();
+      const next = new Map<string, MetaAdSet[]>();
+      for (const id of selectedCampaigns) {
+        const sets = prev.get(id) || [];
+        const filtered = sets.filter((s) => String(s.campaign_id) === String(id));
+        next.set(id, filtered);
+      }
+      return next;
+    });
+    // Limpiar anuncios al cambiar de campañas para evitar arrastre
+    setAdsData(new Map());
+  }, [selectedCampaigns]);
+
+  // Al cambiar selección de ad sets, podar caché de anuncios a solo esos ad sets
+  useEffect(() => {
+    setAdsData((prev) => {
+      if (selectedAdSets.size === 0) return new Map();
+      const next = new Map<string, MetaAd[]>();
+      for (const id of selectedAdSets) {
+        const ads = prev.get(id) || [];
+        const filtered = ads.filter((ad) => !ad.adset_id || String(ad.adset_id) === String(id));
+        next.set(id, filtered);
+      }
+      return next;
+    });
+  }, [selectedAdSets]);
 
   // Seleccionar/deseleccionar conjunto de anuncios
   const toggleAdSetSelection = (adSetId: string) => {
@@ -368,33 +388,36 @@ const Advertising = () => {
 
   // Cargar conjuntos de anuncios cuando se cambia al tab
   useEffect(() => {
-    if (vistaActual === "conjuntos" && selectedCampaigns.size > 0 && usingRealData) {
-      setLoadingAdSets(true);
-      Promise.all(
-        Array.from(selectedCampaigns).map(async (campaignId) => {
-          if (!adSetsData.has(campaignId)) {
-            const adSets = await fetchCampaignAdSets(campaignId, datePreset);
-            return { campaignId, adSets };
-          }
-          return null;
-        })
-      ).then((results) => {
-        const newAdSetsData = new Map(adSetsData);
-        results.forEach((result) => {
-          if (result) {
-            newAdSetsData.set(result.campaignId, result.adSets);
-          }
-        });
-        setAdSetsData(newAdSetsData);
-        setLoadingAdSets(false);
-      });
+    if (!(vistaActual === "conjuntos" && selectedCampaigns.size > 0 && usingRealData)) return;
+    const missing = Array.from(selectedCampaigns).filter((id) => !adSetsData.has(id));
+    if (missing.length === 0) {
+      setLoadingAdSets(false);
+      return;
     }
-  }, [vistaActual, selectedCampaigns]);
+    setLoadingAdSets(true);
+    Promise.all(
+      missing.map(async (campaignId) => {
+        const adSets = await fetchCampaignAdSets(campaignId, datePreset);
+        return { campaignId, adSets };
+      })
+    ).then((results) => {
+      const newAdSetsData = new Map(adSetsData);
+      results.forEach((result) => {
+        newAdSetsData.set(result.campaignId, result.adSets);
+      });
+      setAdSetsData(newAdSetsData);
+      setLoadingAdSets(false);
+    });
+  }, [vistaActual, selectedCampaigns, adSetsData, datePreset, usingRealData]);
 
   // Obtener conjuntos de anuncios de campañas seleccionadas
-  const adSetsFromSelectedCampaigns = Array.from(selectedCampaigns).flatMap(
-    (campaignId) => adSetsData.get(campaignId) || []
-  );
+  const adSetsFromSelectedCampaigns = selectedCampaigns.size === 0
+    ? []
+    : Array.from(selectedCampaigns).flatMap((campaignId) => {
+        const sets = adSetsData.get(campaignId) || [];
+        // Asegurar que solo entren ad sets de esa campaña
+        return sets.filter((s) => String(s.campaign_id) === String(campaignId));
+      });
 
   // Obtener anuncios de conjuntos seleccionados
   
@@ -408,13 +431,13 @@ const Advertising = () => {
     if (!el) return;
     const update = () => setContentWidth(el.scrollWidth);
     update();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ro = new (window as any).ResizeObserver(update);
-    ro.observe(el);
+  const RO: typeof ResizeObserver | undefined = (window as unknown as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
+  const ro = RO ? new RO(update) : undefined;
+  ro?.observe(el);
     window.addEventListener('resize', update);
     return () => { 
       try { 
-        ro.disconnect(); 
+        ro?.disconnect(); 
       } catch (error) {
         console.error("Error disconnecting ResizeObserver:", error);
       } 
@@ -430,9 +453,13 @@ const Advertising = () => {
     const a = tableScrollRef.current, b = topScrollRef.current;
     if (a && b && a.scrollLeft !== b.scrollLeft) a.scrollLeft = b.scrollLeft;
   };
-const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
-    (adSetId) => adsData.get(adSetId) || []
-  );
+const adsFromSelectedAdSets = selectedAdSets.size === 0
+  ? []
+  : Array.from(selectedAdSets).flatMap((adSetId) => {
+      const ads = adsData.get(adSetId) || [];
+      // Filtrar estrictamente por adset_id cuando exista
+      return ads.filter((ad) => !ad.adset_id || String(ad.adset_id) === String(adSetId));
+    });
 
   // Manejar cambio de estado de campaña
   const handleToggleCampaign = async (campaignId: string, currentStatus: "activa" | "pausada" | "finalizada") => {
@@ -515,15 +542,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
     }
   };
 
-  // Función para renderizar el icono de ordenamiento
-  const SortIcon = ({ field }: { field: keyof CampaignData }) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="w-4 h-4 text-gray-400" />;
-    }
-    return sortDirection === 'asc' 
-      ? <ArrowUp className="w-4 h-4 text-blue-600" />
-      : <ArrowDown className="w-4 h-4 text-blue-600" />;
-  };
+  // Using top-level SortIcon
 
   const campaniasFiltradas = campaigns
     .filter(camp => {
@@ -565,7 +584,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                 <h1 className="text-2xl font-bold text-gray-900">Administrador de anuncios</h1>
                 {lastUpdated && (
                   <span className="text-xs text-gray-400 font-normal">
-                    Actualizado hace {Math.floor((Date.now() - lastUpdated.getTime()) / 1000)}s
+                    Actualizado hace {Math.floor((now - lastUpdated.getTime()) / 1000)}s
                   </span>
                 )}
               </div>
@@ -617,32 +636,31 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
 
           {/* Indicador de datos reales - SIEMPRE visible */}
           <div className="mb-2 flex items-center gap-2 text-sm">
-            {loading ? (
-              <>
-                <Badge variant="default" className="bg-blue-500">
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  Actualizando datos desde Meta Ads...
-                </Badge>
-              </>
-            ) : usingRealData ? (
+            {loading && (
+              <Badge variant="default" className="bg-blue-500">
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                Actualizando datos desde Meta Ads...
+              </Badge>
+            )}
+            {!loading && usingRealData && (
               <>
                 <Badge variant="default" className="bg-green-500">
                   <CheckCircle2 className="w-3 h-3 mr-1" />
                   En vivo desde Meta Ads
                 </Badge>
+                <Badge variant="default" className="bg-indigo-500">CI: {getAIScore()}</Badge>
                 <span className="text-gray-500 text-xs">
                   {campaigns.length} campañas • Última actualización: {new Date().toLocaleTimeString()}
                 </span>
               </>
-            ) : (
+            )}
+            {!loading && !usingRealData && (
               <>
                 <Badge variant="destructive">
                   <XCircle className="w-3 h-3 mr-1" />
                   Reconectando con Meta Ads...
                 </Badge>
-                <span className="text-gray-500 text-xs">
-                  Reintentando automáticamente
-                </span>
+                <span className="text-gray-500 text-xs">Reintentando automáticamente</span>
               </>
             )}
           </div>
@@ -733,16 +751,43 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
           </div>
 
           <div className="flex items-center justify-between">
-            {/* Vista selector */}
-            <Tabs value={vistaActual} onValueChange={(v) => setVistaActual(v as "campañas" | "conjuntos" | "anuncios")} className="w-auto">
+            {/* Vista selector con guardas */}
+            <Tabs
+              value={vistaActual}
+              onValueChange={(v) => {
+                const target = v as "campañas" | "conjuntos" | "anuncios";
+                if (target === "conjuntos" && selectedCampaigns.size === 0) {
+                  toast.info("Selecciona una campaña para ver sus conjuntos");
+                  setAdSetsData(new Map());
+                  setVistaActual("campañas");
+                  return;
+                }
+                if (target === "anuncios" && selectedAdSets.size === 0) {
+                  toast.info("Selecciona al menos un conjunto para ver sus anuncios");
+                  // Si hay una campaña, mandamos a conjuntos; si no, a campañas
+                  setVistaActual(selectedCampaigns.size > 0 ? "conjuntos" : "campañas");
+                  return;
+                }
+                setVistaActual(target);
+              }}
+              className="w-auto"
+            >
               <TabsList className="bg-white">
                 <TabsTrigger value="campañas" className="data-[state=active]:bg-blue-50">
                   Campañas
                 </TabsTrigger>
-                <TabsTrigger value="conjuntos" className="data-[state=active]:bg-blue-50">
+                <TabsTrigger
+                  value="conjuntos"
+                  className={`data-[state=active]:bg-blue-50 ${selectedCampaigns.size === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  aria-disabled={selectedCampaigns.size === 0}
+                >
                   Conjuntos de anuncios
                 </TabsTrigger>
-                <TabsTrigger value="anuncios" className="data-[state=active]:bg-blue-50">
+                <TabsTrigger
+                  value="anuncios"
+                  className={`data-[state=active]:bg-blue-50 ${selectedAdSets.size === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  aria-disabled={selectedAdSets.size === 0}
+                >
                   Anuncios
                 </TabsTrigger>
               </TabsList>
@@ -772,6 +817,50 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
               </Button>
             </div>
           </div>
+          {/* Scope/filter chips like Meta when navigating deeper levels */}
+          {vistaActual !== "campañas" && selectedCampaigns.size > 0 && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-gray-600">
+              {selectedCampaigns.size === 1 ? (
+                (() => {
+                  const selectedId = Array.from(selectedCampaigns)[0];
+                  const camp = campaigns.find((c) => c.id === selectedId);
+                  return (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500">Filtrando por campaña:</span>
+                      <Badge variant="secondary" className="flex items-center gap-2">
+                        <span className="max-w-[260px] truncate" title={camp?.nombre}>{camp?.nombre || selectedId}</span>
+                        <button
+                          className="ml-1 inline-flex items-center justify-center rounded hover:text-red-600"
+                          onClick={() => {
+                            setSelectedCampaigns(new Set());
+                            setVistaActual("campañas");
+                          }}
+                          aria-label="Quitar filtro de campaña"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{selectedCampaigns.size} campañas seleccionadas</Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => {
+                      setSelectedCampaigns(new Set());
+                      setVistaActual("campañas");
+                    }}
+                  >
+                    Limpiar
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Tabla principal - Estilo profesional Meta */}
@@ -793,7 +882,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     className="flex items-center gap-1 hover:text-blue-600"
                   >
                     Estado
-                    <SortIcon field="estado" />
+                    <SortIcon field="estado" activeField={sortField} direction={sortDirection} />
                   </button>
                 </TableHead>
                 <TableHead className="min-w-[300px]">
@@ -802,7 +891,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     className="flex items-center gap-1 hover:text-blue-600"
                   >
                     Campaña
-                    <SortIcon field="nombre" />
+                    <SortIcon field="nombre" activeField={sortField} direction={sortDirection} />
                   </button>
                 </TableHead>
                 <TableHead className="text-center">
@@ -811,7 +900,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     className="flex items-center gap-1 hover:text-blue-600 mx-auto"
                   >
                     Entrega
-                    <SortIcon field="entrega" />
+                    <SortIcon field="entrega" activeField={sortField} direction={sortDirection} />
                   </button>
                 </TableHead>
                 <TableHead className="text-center">Rec.</TableHead>
@@ -821,7 +910,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     className="flex items-center gap-1 hover:text-blue-600 ml-auto text-xs"
                   >
                     Presup.
-                    <SortIcon field="presupuesto" />
+                    <SortIcon field="presupuesto" activeField={sortField} direction={sortDirection} />
                   </button>
                 </TableHead>
                 <TableHead className="text-right w-[100px]">
@@ -830,7 +919,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     className="flex items-center gap-1 hover:text-blue-600 ml-auto text-xs"
                   >
                     Gastado
-                    <SortIcon field="gastado" />
+                    <SortIcon field="gastado" activeField={sortField} direction={sortDirection} />
                   </button>
                 </TableHead>
                 <TableHead className="text-right w-[80px]">
@@ -839,7 +928,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     className="flex items-center gap-1 hover:text-blue-600 ml-auto text-xs"
                   >
                     Conv.
-                    <SortIcon field="conversaciones" />
+                    <SortIcon field="conversaciones" activeField={sortField} direction={sortDirection} />
                   </button>
                 </TableHead>
                 <TableHead className="text-right w-[90px]">
@@ -848,7 +937,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     className="flex items-center gap-1 hover:text-blue-600 ml-auto text-xs"
                   >
                     $/Conv.
-                    <SortIcon field="costePorConv" />
+                    <SortIcon field="costePorConv" activeField={sortField} direction={sortDirection} />
                   </button>
                 </TableHead>
                 <TableHead className="text-right w-[70px]">
@@ -857,7 +946,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     className="flex items-center gap-1 hover:text-blue-600 ml-auto text-xs"
                   >
                     Ventas
-                    <SortIcon field="ventas" />
+                    <SortIcon field="ventas" activeField={sortField} direction={sortDirection} />
                   </button>
                 </TableHead>
                 <TableHead className="text-right w-[90px]">
@@ -866,7 +955,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     className="flex items-center gap-1 hover:text-blue-600 ml-auto text-xs"
                   >
                     Ingresos
-                    <SortIcon field="ingresos" />
+                    <SortIcon field="ingresos" activeField={sortField} direction={sortDirection} />
                   </button>
                 </TableHead>
                 <TableHead className="text-right w-[70px]">
@@ -875,7 +964,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     className="flex items-center gap-1 hover:text-blue-600 ml-auto text-xs"
                   >
                     ROAS
-                    <SortIcon field="roas" />
+                    <SortIcon field="roas" activeField={sortField} direction={sortDirection} />
                   </button>
                 </TableHead>
                 <TableHead className="text-right w-[60px]">
@@ -884,7 +973,7 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     className="flex items-center gap-1 hover:text-blue-600 ml-auto text-xs"
                   >
                     CVR
-                    <SortIcon field="cvr" />
+                    <SortIcon field="cvr" activeField={sortField} direction={sortDirection} />
                   </button>
                 </TableHead>
               </TableRow>
@@ -917,7 +1006,20 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <p className="font-medium text-sm whitespace-nowrap cursor-help" title={campaign.nombre}>{campaign.nombre}</p>
+                                <button
+                                  type="button"
+                                  className="font-medium text-sm whitespace-nowrap text-left cursor-pointer text-blue-700 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                                  title="Click para ver conjuntos de anuncios"
+                                  onClick={() => openAdSetsForCampaign(campaign.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      openAdSetsForCampaign(campaign.id);
+                                    }
+                                  }}
+                                >
+                                  {campaign.nombre}
+                                </button>
                               </TooltipTrigger>
                               <TooltipContent className="max-w-md">
                                 <p className="text-xs text-gray-700 break-words">{campaign.nombre}</p>
@@ -984,12 +1086,15 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                     ${(campaign.ingresos / 1000).toFixed(0)}K
                   </TableCell>
                   <TableCell className="text-right">
-                    <span className={`font-bold text-lg ${
-                      campaign.roas >= 4 ? 'text-green-600' :
-                      campaign.roas >= 2 ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
-                      {campaign.roas.toFixed(2)}x
-                    </span>
+                    {(() => {
+                      let cls = 'text-red-600';
+                      if (campaign.roas >= 4) {
+                        cls = 'text-green-600';
+                      } else if (campaign.roas >= 2) {
+                        cls = 'text-yellow-600';
+                      }
+                      return <span className={`font-bold text-lg ${cls}`}>{campaign.roas.toFixed(2)}x</span>;
+                    })()}
                   </TableCell>
                   <TableCell className="text-right">
                     <span className="text-sm font-medium">{campaign.cvr.toFixed(2)}%</span>
@@ -999,25 +1104,29 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
 
               {vistaActual === "conjuntos" && (
                 <>
-                  {loadingAdSets ? (
-                    <TableRow>
-                      <TableCell colSpan={14} className="text-center py-12">
-                        <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
-                        <p className="text-gray-700 font-medium">Cargando conjuntos de anuncios...</p>
-                      </TableCell>
-                    </TableRow>
-                  ) : selectedCampaigns.size === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={14} className="text-center py-12">
-                        <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                        <p className="text-gray-700 font-medium mb-2">Selecciona una campaña</p>
-                        <p className="text-gray-500 text-sm">
-                          Ve a la pestaña "Campañas" y selecciona al menos una campaña para ver sus conjuntos de anuncios
-                        </p>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    adSetsFromSelectedCampaigns.map((adSet) => (
+                  {(() => {
+                    if (selectedCampaigns.size === 0) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={14} className="text-center py-12">
+                            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                            <p className="text-gray-700 font-medium mb-2">Selecciona una campaña</p>
+                            <p className="text-gray-500 text-sm">Ve a la pestaña "Campañas" y haz clic en el nombre para ver sus conjuntos</p>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    if (loadingAdSets) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={14} className="text-center py-12">
+                            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
+                            <p className="text-gray-700 font-medium">Cargando conjuntos de anuncios...</p>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    return adSetsFromSelectedCampaigns.map((adSet) => (
                       <TableRow key={adSet.id} className="hover:bg-gray-50">
                         <TableCell>
                           <input 
@@ -1072,19 +1181,23 @@ const adsFromSelectedAdSets = Array.from(selectedAdSets).flatMap(
                           ${((adSet.ingresos || 0) / 1000).toFixed(0)}K
                         </TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-bold text-lg ${
-                            (adSet.roas || 0) >= 4 ? 'text-green-600' :
-                            (adSet.roas || 0) >= 2 ? 'text-yellow-600' : 'text-red-600'
-                          }`}>
-                            {(adSet.roas || 0).toFixed(2)}x
-                          </span>
+                          {(() => {
+                            const r = adSet.roas || 0;
+                            let cls = 'text-red-600';
+                            if (r >= 4) {
+                              cls = 'text-green-600';
+                            } else if (r >= 2) {
+                              cls = 'text-yellow-600';
+                            }
+                            return <span className={`font-bold text-lg ${cls}`}>{r.toFixed(2)}x</span>;
+                          })()}
                         </TableCell>
                         <TableCell className="text-right">
                           <span className="text-sm font-medium">{(adSet.cvr || 0).toFixed(2)}%</span>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </>
               )}
 

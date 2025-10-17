@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificador de Permisos Meta Ads</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #0066ff;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        button:hover {
+            background: #0052cc;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .account-card {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #0066ff;
+        }
+        .account-card.error {
+            border-left-color: #dc3545;
+        }
+        .account-card.success {
+            border-left-color: #28a745;
+        }
+        .permission {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 5px;
+            background: #e7f3ff;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0066ff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Verificador de Permisos Meta Ads API</h1>
+        
+        <div class="input-group">
+            <label for="token">Access Token de Meta:</label>
+            <input type="text" id="token" placeholder="EAAC4zHE6iMY..." value="EAAC4zHE6iMYBPt67m4GY5ML3mWCGeBPiO6N6i6i751ZCOfdSSytbfrXnQ6mRcZBHhJXZBmZCWmgZB4V9Ws4oBpQTTMO6zequoZBNBRuXgHGggZCMNWAaMB3L2ubFyBieDeMj5WLP01AZB04Q7vC0DOs1SGkUUszktaBiXcVKapvGwXwotsTyy0MHZA1I52fZB4Rv4DVQZDZD">
+        </div>
+
+        <div class="input-group">
+            <label for="accounts">IDs de Cuentas (separados por coma):</label>
+            <input type="text" id="accounts" placeholder="360084149294973,5518735214914409" value="360084149294973,5518735214914409">
+        </div>
+
+        <button onclick="checkPermissions()" id="checkBtn">Verificar Permisos</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function checkPermissions() {
+            const token = document.getElementById('token').value.trim();
+            const accounts = document.getElementById('accounts').value.trim().split(',').map(id => id.trim());
+            const resultDiv = document.getElementById('result');
+            const btn = document.getElementById('checkBtn');
+
+            if (!token) {
+                resultDiv.innerHTML = '<div class="result error">❌ Por favor ingresa un token de acceso</div>';
+                return;
+            }
+
+            btn.disabled = true;
+            resultDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Verificando permisos...</p></div>';
+
+            try {
+                // 1. Verificar el token
+                console.log('🔐 Verificando token...');
+                const debugUrl = `https://graph.facebook.com/v21.0/debug_token?input_token=${token}&access_token=${token}`;
+                const debugRes = await fetch(debugUrl);
+                const debugData = await debugRes.json();
+
+                let html = '<h2>📊 Resultados:</h2>';
+
+                // Información del token
+                if (debugData.data) {
+                    const tokenInfo = debugData.data;
+                    html += `<div class="result info">
+                        <strong>✅ Token Válido</strong><br>
+                        App ID: ${tokenInfo.app_id || 'N/A'}<br>
+                        Usuario: ${tokenInfo.user_id || 'N/A'}<br>
+                        Expira: ${tokenInfo.expires_at ? new Date(tokenInfo.expires_at * 1000).toLocaleString() : 'Nunca'}<br>
+                        <br><strong>Permisos otorgados:</strong><br>
+                        ${(tokenInfo.scopes || []).map(scope => `<span class="permission">${scope}</span>`).join('')}
+                    </div>`;
+                } else {
+                    html += `<div class="result error">❌ Token inválido o expirado</div>`;
+                    resultDiv.innerHTML = html;
+                    btn.disabled = false;
+                    return;
+                }
+
+                // 2. Verificar cada cuenta
+                html += '<h3>📁 Cuentas Publicitarias:</h3>';
+
+                for (const accountId of accounts) {
+                    console.log(`📡 Verificando cuenta: ${accountId}`);
+                    
+                    try {
+                        const accountUrl = `https://graph.facebook.com/v21.0/act_${accountId}?fields=id,name,account_status,currency,timezone_name&access_token=${token}`;
+                        const accountRes = await fetch(accountUrl);
+                        const accountData = await accountRes.json();
+
+                        if (accountData.error) {
+                            html += `<div class="account-card error">
+                                <strong>❌ Cuenta: act_${accountId}</strong><br>
+                                <strong>Error:</strong> ${accountData.error.message}<br>
+                                <strong>Código:</strong> ${accountData.error.code}<br>
+                                <strong>Tipo:</strong> ${accountData.error.type}<br>
+                                <br>
+                                <strong>💡 Solución:</strong><br>
+                                ${accountData.error.code === 200 ? 
+                                    '• Ve a Facebook Business Manager<br>• Selecciona esta cuenta publicitaria<br>• Agrega el usuario/app con rol "Admin" o "Advertiser"' :
+                                    '• Verifica que el ID sea correcto<br>• Asegúrate que la cuenta exista'
+                                }
+                            </div>`;
+                        } else {
+                            // Intentar obtener campañas
+                            const campaignsUrl = `https://graph.facebook.com/v21.0/act_${accountId}/campaigns?fields=id,name&limit=5&access_token=${token}`;
+                            const campaignsRes = await fetch(campaignsUrl);
+                            const campaignsData = await campaignsRes.json();
+
+                            html += `<div class="account-card success">
+                                <strong>✅ Cuenta: ${accountData.name}</strong><br>
+                                ID: act_${accountId}<br>
+                                Estado: ${accountData.account_status === 1 ? 'Activa ✓' : 'Inactiva ✗'}<br>
+                                Moneda: ${accountData.currency}<br>
+                                Zona horaria: ${accountData.timezone_name}<br>
+                                <br>
+                                <strong>Campañas encontradas:</strong> ${campaignsData.data ? campaignsData.data.length : 0}<br>
+                                ${campaignsData.data && campaignsData.data.length > 0 ? 
+                                    `<small>${campaignsData.data.map(c => `• ${c.name}`).join('<br>')}</small>` : 
+                                    '<small>⚠️ No hay campañas o no tienes permiso para verlas</small>'
+                                }
+                            </div>`;
+                        }
+                    } catch (error) {
+                        html += `<div class="account-card error">
+                            <strong>❌ Cuenta: act_${accountId}</strong><br>
+                            Error de conexión: ${error.message}
+                        </div>`;
+                    }
+                }
+
+                // Recomendaciones
+                html += `<div class="result info" style="margin-top: 20px;">
+                    <strong>📝 Próximos Pasos:</strong><br><br>
+                    1. Si ves errores 403 o (#200), necesitas dar permisos en Business Manager<br>
+                    2. Si el token no tiene el permiso 'ads_read', genera un nuevo token<br>
+                    3. Una vez corregido, actualiza VITE_META_ACCESS_TOKEN y VITE_META_AD_ACCOUNT_IDS<br>
+                    4. Haz git commit y push para desplegar
+                </div>`;
+
+                resultDiv.innerHTML = html;
+
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">
+                    ❌ Error inesperado:<br><br>
+                    ${error.message}<br><br>
+                    ${error.stack}
+                </div>`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Auto-ejecutar al cargar si hay valores por defecto
+        window.addEventListener('load', () => {
+            const token = document.getElementById('token').value;
+            if (token && token.startsWith('EAAC')) {
+                checkPermissions();
+            }
+        });
+    </script>
+</body>
+</html>

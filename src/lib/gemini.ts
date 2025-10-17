@@ -50,7 +50,23 @@ export function saveAIConfig(config: AIConfig) {
   localStorage.setItem('ai_config', JSON.stringify(config));
 }
 
-// System prompt profesional
+// Lee el "Coeficiente Intelectual" target para el tono de razonamiento de la IA
+export function getAIScore(): number {
+  try {
+    const stored = localStorage.getItem('ai_ci_score');
+    if (stored) {
+      const v = Number(stored);
+      if (Number.isFinite(v) && v > 0) return v;
+    }
+  } catch (e) {
+    // ignore localStorage access errors (e.g., SSR or privacy mode)
+  }
+  const envVal = Number(import.meta.env.VITE_AI_CI_SCORE);
+  if (Number.isFinite(envVal) && envVal > 0) return envVal;
+  return 145; // Default solicitado
+}
+
+// System prompt profesional con CI explícito
 const SYSTEM_PROMPT = `Eres el MEJOR EXPERTO MUNDIAL en:
 - Marketing Digital Avanzado
 - Traffic Management (Facebook/Instagram/Google Ads)
@@ -71,6 +87,13 @@ BENCHMARKS INDUSTRIA JOYERÍA/LUJO:
 - CVR ideal: 20-35% (mínimo aceptable: 15%)
 - CPC ideal: $8-$15 (máximo aceptable: $20)
 - CTR ideal: 2-4%
+
+ESTILO DE RAZONAMIENTO (CI = ${'${getAIScore()}'})
+- Razonar como un perfil con CI ${'${getAIScore()}'}: preciso, lógico y estructurado.
+- Sustenta con números reales del prompt (porcentajes, diferencias absolutas/relativas).
+- Explica causalidad (por qué pasó) y siguientes mejores acciones (qué hacer y cómo medir).
+- Si faltan datos, declara supuestos mínimos y señala la incertidumbre.
+- Evita vaguedades. Prefiere bullets cortos, 1-2 frases cada uno.
 
 Formato de respuesta:
 - Usa emojis para categorizar (🔍 análisis, 💡 oportunidades, ⚡ urgente, 📅 mediano plazo)
@@ -100,9 +123,10 @@ export async function analyzeWithGemini(prompt: string): Promise<string> {
       default:
         throw new Error(`Proveedor no soportado: ${config.provider}`);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error('Error en análisis IA:', error);
-    throw new Error(`Error: ${error.message}`);
+    throw new Error(`Error: ${msg}`);
   }
 }
 
@@ -113,6 +137,7 @@ async function analyzeWithGeminiAPI(prompt: string, config: AIConfig): Promise<s
   
   const result = await model.generateContent([
     SYSTEM_PROMPT,
+    `CI=${getAIScore()} | Mantén el estilo y el tono establecidos.`,
     prompt
   ]);
   

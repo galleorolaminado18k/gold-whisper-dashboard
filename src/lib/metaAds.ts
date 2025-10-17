@@ -458,7 +458,7 @@ export async function fetchCampaignAdSets(
         try {
           const label = `adset:${adSet.id}`; // Asumiendo que las conversaciones pueden etiquetarse por adset
           const convs = await fetchConversationsByLabel(label);
-          let conversaciones = Array.isArray(convs) ? convs.length : 0;
+          const conversaciones = Array.isArray(convs) ? convs.length : 0;
 
           // Contar ventas (conversaciones en etapa 'pedido_completo') vía clasificador
           let ventas = 0;
@@ -493,7 +493,7 @@ export async function fetchCampaignAdSets(
           const gastado = enrichedAdSet.insights?.spend || 0;
           const costePorConv = conversaciones > 0 ? gastado / conversaciones : 0;
           const roas = gastado > 0 ? ingresos / gastado : 0;
-          const cvr = ventas > 0 ? (conversaciones / ventas) * 100 : 0; // CVR = Conversaciones / Ventas (según solicitud del usuario)
+          const cvr = conversaciones > 0 ? (ventas / conversaciones) * 100 : 0; // CVR = Ventas / Conversaciones
 
           enrichedAdSet = { 
             ...enrichedAdSet, 
