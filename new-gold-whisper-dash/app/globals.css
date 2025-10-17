@@ -29,6 +29,11 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
+  
+  /* Variables para Gold Whisper Dashboard */
+  --gold: #f59e0b;
+  --gold-light: #fcd34d;
+  --gold-dark: #b45309;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -206,6 +211,24 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  
+  /* Gradientes dorados y sombras para Gold Whisper Dashboard */
+  .bg-gradient-gold {
+    background: linear-gradient(45deg, #f59e0b 0%, #fbbf24 55%, #fde68a 100%);
+  }
+  
+  .border-gold {
+    border-color: var(--gold);
+  }
+  
+  .text-gold {
+    color: var(--gold);
+  }
+  
+  .shadow-gold {
+    box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.25),
+                0 5px 10px -5px rgba(245, 158, 11, 0.1);
   }
 }
 
