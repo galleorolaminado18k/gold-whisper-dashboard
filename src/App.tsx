@@ -29,14 +29,19 @@ const queryClient = new QueryClient();
 
 const App: React.FC = () => {
   const rawBase =
-    import.meta.env.VITE_ROUTER_BASENAME ??
-    import.meta.env.BASE_URL ??
+    (import.meta.env.VITE_ROUTER_BASENAME as any) ??
+    (import.meta.env.BASE_URL as any) ??
     "/";
 
-  const normalizedBase =
-    rawBase === "/"
-      ? ""
-      : rawBase.replace(/\/+$/, "") || "";
+  const normalizedBase = (function normalizeBasename(v: string): string {
+    const t = (v || "").trim();
+    if (t === "/" || t === "./" || t === ".") return "";
+    let b = t.replace(/\/+$/, "");
+    if (!b) return "";
+    if (!b.startsWith("/")) b = "/" + b;
+    if (b === "/.") return "";
+    return b;
+  })(rawBase);
 
   // Restore deep-link after GitHub Pages 404 redirect
   useEffect(() => {
@@ -48,8 +53,9 @@ const App: React.FC = () => {
     const current = location.pathname.replace(/^\/+/, '');
     if (current !== target.replace(/^\/+/, '')) {
       let next = `${normalizedBase}/${target}`;
-  // collapse multiple slashes (ES2020-safe)
-  while (/\/\//.test(next)) next = next.replace(/\/\//g, '/');
+      // collapse multiple slashes (ES2020-safe)
+  // collapse multiple slashes
+  next = (next as any).replaceAll ? (next as any).replaceAll('//', '/') : next.replace(/\/\//g, '/');
       // ensure leading slash
       if (!next.startsWith('/')) next = '/' + next;
       history.replaceState(null, '', next);

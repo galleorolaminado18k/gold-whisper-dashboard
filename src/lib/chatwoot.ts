@@ -26,7 +26,15 @@ export type CWConversation = {
 const isProd = import.meta.env.PROD === true;
 const CHATWOOT_ENABLED = (import.meta.env.VITE_CHATWOOT_ENABLED ?? "false").toString() === "true";
 const API = (import.meta.env.VITE_BRIDGE_API_URL as string | undefined) || (isProd ? "" : "http://localhost:4000");
-const CHATWOOT_URL = (import.meta.env.VITE_CHATWOOT_URL as string | undefined) || (isProd ? "" : "http://localhost:3020");
+function normalizeBaseUrl(url: string): string {
+  let u = (url || "").trim();
+  if (!u) return "";
+  if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+  return u.replace(/\/$/, "");
+}
+const CHATWOOT_URL = normalizeBaseUrl(
+  (import.meta.env.VITE_CHATWOOT_URL as string | undefined) || (isProd ? "" : "http://localhost:3020")
+);
 const CHATWOOT_TOKEN = (import.meta.env.VITE_CHATWOOT_WEBSITE_TOKEN as string | undefined) || "";
 const CHATWOOT_ACCOUNT_ID = (import.meta.env.VITE_CHATWOOT_ACCOUNT_ID as string | undefined) || (isProd ? "" : "1");
 
