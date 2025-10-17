@@ -2,14 +2,19 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Redirecting…</title>
-    <meta http-equiv="refresh" content="0; url=/" />
+    <title>Redirectingâ€¦</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script>
-      try {
-        sessionStorage.setItem('redirectAfterReload', location.pathname + location.search + location.hash);
-      } catch (e) {}
-      location.replace('/');
+      (function(){
+        try {
+          sessionStorage.setItem('redirectAfterReload', location.pathname + location.search + location.hash);
+        } catch (_) {}
+        var base = '/gold-whisper-dashboard/';
+        var ts = Date.now();
+        var absolute = location.protocol + '//' + location.host + base + '?v=' + ts;
+        location.replace(absolute);
+      })();
     </script>
   </head>
-  <body>Redirecting…</body>
+  <body>Redirectingâ€¦</body>
 </html>
