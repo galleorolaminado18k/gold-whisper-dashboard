@@ -34,6 +34,13 @@ jobs:
       - name: Checkout 🛎️
         uses: actions/checkout@v4
 
+      - name: Guard – ensure no .env files are committed
+        run: |
+          if git ls-files | grep -E '(^|/)\.env(\.|$)'; then
+            echo "Error: One or more .env files are tracked in git. Remove them and push again." >&2
+            exit 1
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
