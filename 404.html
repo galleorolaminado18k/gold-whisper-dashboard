@@ -15,12 +15,11 @@
         var isGithub = /github\.io$/i.test(location.host);
         // Ajusta el nombre del repo si fuese necesario en forks; aquí usamos el actual
         var repoBase = '/gold-whisper-dashboard';
-        var target = isGithub ? repoBase + '/' : '/';
-        // Forzar URL absoluta en github.io para evitar bases relativas
-        if (isGithub) {
-          target = location.protocol + '//' + location.host + target;
-        }
-        location.replace(target);
+        var basePath = isGithub ? repoBase + '/' : '/';
+        // Fuerza URL absoluta SIEMPRE y agrega cache-busting para evitar HTML antiguo cacheado
+        var ts = Date.now();
+        var absolute = location.protocol + '//' + location.host + basePath + '?v=' + ts;
+        location.replace(absolute);
       })();
     </script>
   </head>
