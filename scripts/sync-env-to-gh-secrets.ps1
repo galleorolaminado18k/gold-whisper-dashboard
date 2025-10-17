@@ -47,7 +47,7 @@ foreach ($line in $lines) {
   $proc.WaitForExit()
   if ($proc.ExitCode -ne 0) {
     $err = $proc.StandardError.ReadToEnd()
-    Write-Error "Failed to set secret $key: $err"
+    Write-Error "Failed to set secret ${key}: $err"
     exit $proc.ExitCode
   }
 }
