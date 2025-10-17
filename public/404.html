@@ -2,14 +2,27 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Redirecting…</title>
-    <meta http-equiv="refresh" content="0; url=/" />
+    <title>Redirectingâ€¦</title>
+    <!-- Redirect to the GitHub Pages project subpath -->
+    <meta http-equiv="refresh" content="0; url=/gold-whisper-dashboard/" />
     <script>
-      try {
-        sessionStorage.setItem('redirectAfterReload', location.pathname + location.search + location.hash);
-      } catch (e) {}
-      location.replace('/');
+      (function () {
+        var basePath = '/gold-whisper-dashboard';
+        try {
+          sessionStorage.setItem(
+            'redirectAfterReload',
+            location.pathname + location.search + location.hash
+          );
+        } catch (e) {}
+        var l = window.location;
+        var target = basePath + '/';
+        if (l.origin && l.origin.indexOf('github.io') !== -1) {
+          // Ensure absolute URL to avoid mixed base issues
+          target = l.protocol + '//' + l.host + basePath + '/';
+        }
+        l.replace(target);
+      })();
     </script>
   </head>
-  <body>Redirecting…</body>
-</html>
+  <body>Redirectingâ€¦</body>
+  </html>

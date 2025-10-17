@@ -44,6 +44,21 @@ const App: React.FC = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter basename={normalizedBase}>
+          {/* Restore deep-link after GitHub Pages 404 redirect */}
+          {(() => {
+            try {
+              const key = 'redirectAfterReload';
+              const pending = sessionStorage.getItem(key);
+              if (pending) {
+                sessionStorage.removeItem(key);
+                const target = pending.replace(/^\/+/, '');
+                if (window.location.pathname.replace(/^\/+/, '') !== target.replace(/^\/+/, '')) {
+                  // Use history API to avoid full reload
+                  window.history.replaceState(null, '', `${normalizedBase}/${target}`.replace(/\/+/g, '/'));
+                }
+              }
+            } catch (e) {}
+          })()}
           <AuthProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
