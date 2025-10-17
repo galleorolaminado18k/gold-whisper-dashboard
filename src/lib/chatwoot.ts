@@ -126,6 +126,7 @@ function normConversationsResponse(raw: unknown): CWConversation[] {
 
 // ===== API: conversaciones =====
 export async function fetchConversations(): Promise<CWConversation[]> {
+  if (!CHATWOOT_ENABLED || !API) return [];
   const r = await fetch(`${API}/conversations`);
   if (!r.ok) {
     console.warn("fetchConversations:", r.status, r.statusText);
@@ -138,6 +139,7 @@ export async function fetchConversations(): Promise<CWConversation[]> {
 // Conversaciones filtradas por etiqueta (usa endpoint extendido del bridge)
 export async function fetchConversationsByLabel(label: string): Promise<CWConversation[]> {
   try {
+    if (!CHATWOOT_ENABLED || !API) return [];
     const qs = new URLSearchParams({ labels: label }).toString();
     const r = await fetch(`${API}/conversations-by-label?${qs}`);
     if (!r.ok) return [];
@@ -159,6 +161,7 @@ export async function addConversationLabels(
   labels: string[]
 ): Promise<boolean> {
   try {
+    if (!CHATWOOT_ENABLED || !API) return false;
     const r = await fetch(`${API}/conversations/${conversationId}/labels`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -175,6 +178,7 @@ export async function deleteConversationLabel(
   label: string
 ): Promise<boolean> {
   try {
+    if (!CHATWOOT_ENABLED || !API) return false;
     const r = await fetch(`${API}/conversations/${conversationId}/labels/${encodeURIComponent(label)}`, {
       method: 'DELETE',
     });
@@ -210,6 +214,7 @@ export async function fetchMessages(
   convId: number | string
 ): Promise<CWMessage[]> {
   try {
+    if (!CHATWOOT_ENABLED || !API) return [];
     const r = await fetch(`${API}/conversations/${convId}/messages`);
     if (!r.ok) return [];
 
@@ -241,6 +246,9 @@ export async function sendMessage(
   conversationId: number | string,
   content: string
 ) {
+  if (!CHATWOOT_ENABLED || !API) {
+    throw new Error("Chatwoot bridge no configurado");
+  }
   const r = await fetch(`${API}/send-message`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
