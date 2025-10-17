@@ -3,9 +3,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
-// Permite servir en subruta (/gold-whisper-dashboard) o en dominio propio con rutas relativas (./)
-const baseEnv = process.env.VITE_ASSET_BASE?.trim();
-const base = baseEnv !== undefined ? baseEnv : "/";
+// Forzar base relativa para que funcione tanto en dominio propio como en subruta
+const base = "./";
 
 export default defineConfig({
   base,

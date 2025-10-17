@@ -1,29 +1,9 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  ReactNode,
-} from "react";
+import { useEffect, useState, ReactNode, useCallback, useMemo } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (
-    email: string,
-    password: string,
-    fullName: string,
-  ) => Promise<{ error: Error | null }>;
-  signOut: () => Promise<void>;
-  loading: boolean;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { AuthContext } from "@/contexts/auth-context";
 
 const FALLBACK_STORAGE_KEY = "galle-fallback-auth";
 
@@ -43,7 +23,7 @@ function normalizeEnvBoolean(value: unknown): boolean {
   return false;
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,17 +45,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .filter(Boolean)
       : null;
 
-  const createMockUser = (email: string, fullName: string): User =>
-    ({
-      id: generateFallbackId(),
-      email,
-      user_metadata: { full_name: fullName },
-      app_metadata: {},
-      aud: "authenticated",
-      created_at: new Date().toISOString(),
-    }) as User;
+  const createMockUser = useCallback(
+    (email: string, fullName: string): User =>
+      ({
+        id: generateFallbackId(),
+        email,
+        user_metadata: { full_name: fullName },
+        app_metadata: {},
+        aud: "authenticated",
+        created_at: new Date().toISOString(),
+      }) as User,
+    [],
+  );
 
-  const persistFallbackSession = (email: string, name: string) => {
+  const persistFallbackSession = useCallback((email: string, name: string) => {
     if (!fallbackEnabled) return;
     try {
       localStorage.setItem(
@@ -85,18 +68,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore storage errors (e.g., private mode)
     }
-  };
+  }, [fallbackEnabled]);
 
-  const clearFallbackSession = () => {
+  const clearFallbackSession = useCallback(() => {
     if (!fallbackEnabled) return;
     try {
       localStorage.removeItem(FALLBACK_STORAGE_KEY);
     } catch {
       // ignore
     }
-  };
+  }, [fallbackEnabled]);
 
-  const canUseFallbackForEmail = (email: string) => {
+  const canUseFallbackForEmail = useCallback((email: string) => {
     if (!fallbackEnabled) return false;
     const normalized = email.trim().toLowerCase();
     if (fallbackAllowedEmails && fallbackAllowedEmails.length > 0) {
@@ -106,9 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return normalized === fallbackEmail;
     }
     return true;
-  };
+  }, [fallbackAllowedEmails, fallbackEmail, fallbackEnabled]);
 
-  const applyFallbackSession = (
+  const applyFallbackSession = useCallback((
     email: string,
     {
       name,
@@ -137,9 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return true;
-  };
+  }, [canUseFallbackForEmail, fallbackDisplayName, navigate, createMockUser, persistFallbackSession]);
 
-  const restoreFallbackSession = ({
+  const restoreFallbackSession = useCallback(({ 
     silent = false,
   }: { silent?: boolean } = {}): boolean => {
     if (!fallbackEnabled) return false;
@@ -170,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearFallbackSession();
       return false;
     }
-  };
+  }, [fallbackEnabled, fallbackDisplayName, createMockUser, clearFallbackSession]);
 
   const isNetworkError = (message: string) => {
     const lower = message.toLowerCase();
@@ -220,7 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           restoreFallbackSession({ silent: true });
         }
         setLoading(false);
-      } catch (error) {
+      } catch {
         if (!restoreFallbackSession({ silent: true })) {
           setLoading(false);
         }
@@ -232,9 +215,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription?.unsubscribe();
     };
-  }, [fallbackEnabled]);
+  }, [fallbackEnabled, clearFallbackSession, restoreFallbackSession]);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     try {
       const isDevelopment = import.meta.env.DEV;
       const wantsFallback = canUseFallbackForEmail(email);
@@ -280,6 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null };
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error("Error desconocido");
+      const wantsFallback = canUseFallbackForEmail(email);
       if (
         (isNetworkError(err.message) || wantsFallback) &&
         applyFallbackSession(email, {
@@ -293,11 +277,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast.error("Error al iniciar sesión");
       return { error: err };
     }
-  };
+  }, [applyFallbackSession, canUseFallbackForEmail, clearFallbackSession, fallbackEmail, navigate, createMockUser]);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
     try {
-      const redirectUrl = `${window.location.origin}/`;
+  const redirectUrl = `${globalThis.location.origin}/`;
 
       const { error } = await supabase.auth.signUp({
         email,
@@ -342,9 +326,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast.error("Error al crear la cuenta");
       return { error: err };
     }
-  };
+  }, [applyFallbackSession, canUseFallbackForEmail, navigate, clearFallbackSession]);
 
-  const signOut = async () => {
+  const signInAsGuest = useCallback((email?: string, name?: string) => {
+    const e = email || (import.meta.env.VITE_FALLBACK_AUTH_EMAIL as string) || "invitado@galle18k.com";
+    const n = name || (import.meta.env.VITE_FALLBACK_AUTH_NAME as string) || fallbackDisplayName;
+    applyFallbackSession(e, { name: n, showToast: true, redirect: true });
+  }, [applyFallbackSession, fallbackDisplayName]);
+
+  const signOut = useCallback(async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
@@ -379,21 +369,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       toast.error("Error al cerrar sesión");
     }
-  };
+  }, [clearFallbackSession, navigate]);
 
-  return (
-    <AuthContext.Provider
-      value={{ user, session, signIn, signUp, signOut, loading }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const contextValue = useMemo(
+    () => ({ user, session, signIn, signUp, signOut, signInAsGuest, loading }),
+    [user, session, signIn, signUp, signOut, signInAsGuest, loading],
   );
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
-}
+// Note: This file now only exports the Provider component to keep Fast Refresh working properly.

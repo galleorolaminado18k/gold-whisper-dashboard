@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -29,7 +29,7 @@ type SignInFormData = z.infer<typeof signInSchema>;
 type SignUpFormData = z.infer<typeof signUpSchema>;
 
 const Auth = () => {
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, signInAsGuest } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
@@ -53,10 +53,12 @@ const Auth = () => {
 
   // Forzar autocomplete="new-password" en el formulario de registro
   useEffect(() => {
-    const form = document.querySelector('form[data-form="signup"]') as HTMLFormElement | null;
+    const form = document.querySelector('form[data-form="signup"]');
     if (form) {
-      const pwInputs = form.querySelectorAll('input[type="password"]');
-      pwInputs.forEach((el) => el.setAttribute('autocomplete', 'new-password'));
+      const pwInputs = form.querySelectorAll<HTMLInputElement>('input[type="password"]');
+      for (const el of Array.from(pwInputs)) {
+        el.setAttribute('autocomplete', 'new-password');
+      }
       form.setAttribute('autocomplete', 'new-password');
     }
   }, []);
@@ -99,16 +101,7 @@ const Auth = () => {
           {/* Texto superior */}
           <div>
             <h1 className="text-6xl font-bold italic mb-2">
-              ¡Bienvenid
-              <span 
-                className="font-bold italic"
-                style={{ 
-                  color: '#d4af37',
-                  textShadow: '0 0 20px rgba(212, 175, 55, 0.8), 0 0 40px rgba(242, 208, 107, 0.6)',
-                }}
-              >
-                @
-              </span>
+              ¡Bienvenid@
             </h1>
             <h2 className="text-5xl font-bold italic">a tu segunda casa!</h2>
           </div>
@@ -250,10 +243,20 @@ const Auth = () => {
                       {loading ? "Ingresando..." : "Iniciar Sesión"}
                     </Button>
 
-                    <div className="text-center mt-4">
-                      <a href="#" className="text-gray-400 text-sm italic hover:text-white">
+                    <div className="flex items-center justify-between mt-4">
+                      <button type="button" className="text-gray-400 text-sm italic hover:text-white">
                         ¿Olvidaste tu contraseña?
-                      </a>
+                      </button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          const email = signInForm.getValues("email") || "invitado@galle18k.com";
+                          signInAsGuest(email);
+                        }}
+                      >
+                        Entrar como invitado
+                      </Button>
                     </div>
                   </form>
                 </Form>

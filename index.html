@@ -24,10 +24,46 @@
   </head>
 
   <body>
+    <div id="boot-status" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#fff;color:#111;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;z-index:99999">
+      <div style="text-align:center">
+        <div style="width:44px;height:44px;margin:0 auto 12px;border-radius:50%;border:4px solid #d4af37;border-top-color:transparent;animation:spin 0.9s linear infinite"></div>
+        <div>Cargando dashboard…</div>
+        <div id="boot-error" style="margin-top:8px;color:#b91c1c;font-size:12px;max-width:80ch"></div>
+      </div>
+      <style>
+        @keyframes spin { to { transform: rotate(360deg) } }
+      </style>
+    </div>
     <div id="root"></div>
 
     <!-- Tu app (Vite) -->
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Overlay de errores de arranque para diagnosticar pantalla en blanco -->
+    <script>
+      (function () {
+        function showBootError(msg) {
+          try {
+            var el = document.getElementById('boot-error');
+            if (!el) return;
+            el.textContent = String(msg || 'Error desconocido al iniciar');
+          } catch {}
+        }
+        window.addEventListener('error', function (e) {
+          try {
+            var m = (e && e.error && e.error.message) || (e && e.message) || e;
+            showBootError(m);
+          } catch {}
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          try {
+            var r = e && e.reason;
+            var m = (r && (r.message || r.msg)) || String(r);
+            showBootError(m);
+          } catch {}
+        });
+      })();
+    </script>
 
     <!-- Forzar HTTPS en producción en caso de proxies sin redirección -->
     <script>

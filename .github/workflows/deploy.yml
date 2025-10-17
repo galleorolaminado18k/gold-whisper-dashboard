@@ -17,7 +17,8 @@ jobs:
       VITE_ROUTER_BASENAME: ""
       # Allow offline mode if Supabase is not configured
       VITE_ENABLE_FALLBACK_AUTH: true
-      VITE_FALLBACK_AUTH_EMAIL: "usuario@galle18k.com"
+      # Si está vacío, cualquier email puede usar el modo invitado
+      VITE_FALLBACK_AUTH_EMAIL: ""
       VITE_FALLBACK_AUTH_NAME: "Usuario Invitado"
       # App Secrets (configure in repo Settings > Secrets and variables > Actions)
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
