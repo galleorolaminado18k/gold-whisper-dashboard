@@ -179,15 +179,26 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
           if (nextSession?.user) {
             clearFallbackSession();
           } else if (!nextSession) {
-            restoreFallbackSession({ silent: true });
+            // intenta restaurar fallback si existe
+            const restored = restoreFallbackSession({ silent: true });
+            // si no se pudo restaurar y el fallback está habilitado, auto-invitar
+            if (!restored && fallbackEnabled) {
+              const email = (import.meta.env.VITE_FALLBACK_AUTH_EMAIL as string) || "invitado@galle18k.com";
+              const name = (import.meta.env.VITE_FALLBACK_AUTH_NAME as string) || fallbackDisplayName;
+              applyFallbackSession(email, { name, showToast: false, redirect: false });
+            }
           }
           setLoading(false);
         });
         subscription = sub;
       } catch {
-        if (!restoreFallbackSession({ silent: true })) {
-          setLoading(false);
+        const restored = restoreFallbackSession({ silent: true });
+        if (!restored && fallbackEnabled) {
+          const email = (import.meta.env.VITE_FALLBACK_AUTH_EMAIL as string) || "invitado@galle18k.com";
+          const name = (import.meta.env.VITE_FALLBACK_AUTH_NAME as string) || fallbackDisplayName;
+          applyFallbackSession(email, { name, showToast: false, redirect: false });
         }
+        setLoading(false);
         return;
       }
 
@@ -200,13 +211,22 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
         if (currentSession?.user) {
           clearFallbackSession();
         } else {
-          restoreFallbackSession({ silent: true });
+          const restored = restoreFallbackSession({ silent: true });
+          if (!restored && fallbackEnabled) {
+            const email = (import.meta.env.VITE_FALLBACK_AUTH_EMAIL as string) || "invitado@galle18k.com";
+            const name = (import.meta.env.VITE_FALLBACK_AUTH_NAME as string) || fallbackDisplayName;
+            applyFallbackSession(email, { name, showToast: false, redirect: false });
+          }
         }
         setLoading(false);
       } catch {
-        if (!restoreFallbackSession({ silent: true })) {
-          setLoading(false);
+        const restored = restoreFallbackSession({ silent: true });
+        if (!restored && fallbackEnabled) {
+          const email = (import.meta.env.VITE_FALLBACK_AUTH_EMAIL as string) || "invitado@galle18k.com";
+          const name = (import.meta.env.VITE_FALLBACK_AUTH_NAME as string) || fallbackDisplayName;
+          applyFallbackSession(email, { name, showToast: false, redirect: false });
         }
+        setLoading(false);
       }
     };
 
@@ -215,7 +235,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
     return () => {
       subscription?.unsubscribe();
     };
-  }, [fallbackEnabled, clearFallbackSession, restoreFallbackSession]);
+  }, [fallbackEnabled, clearFallbackSession, restoreFallbackSession, applyFallbackSession, fallbackDisplayName]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     try {

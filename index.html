@@ -19,8 +19,7 @@
     <!-- ADICIONES SEGURAS (no se eliminó nada relevante) -->
     <meta name="theme-color" content="#ffffff" />
     <link rel="icon" href="/favicon.ico" />
-    <!-- Si algún día sirves por HTTPS y cargas algo HTTP, esta línea evita mixed-content -->
-    <!-- <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests"> -->
+  <!-- Si algún día sirves por HTTPS y cargas algo HTTP, esta línea evita mixed-content -->
   </head>
 
   <body>
@@ -49,19 +48,34 @@
             el.textContent = String(msg || 'Error desconocido al iniciar');
           } catch {}
         }
-        window.addEventListener('error', function (e) {
+        globalThis.addEventListener('error', function (e) {
           try {
             var m = (e && e.error && e.error.message) || (e && e.message) || e;
             showBootError(m);
-          } catch {}
+          } catch (err) { console.warn('boot overlay error handler failed', err); }
         });
-        window.addEventListener('unhandledrejection', function (e) {
+        globalThis.addEventListener('unhandledrejection', function (e) {
           try {
             var r = e && e.reason;
             var m = (r && (r.message || r.msg)) || String(r);
             showBootError(m);
-          } catch {}
+          } catch (err) { console.warn('boot overlay rejection handler failed', err); }
         });
+
+        // Si la app no monta en N segundos, forzar recarga con cache-busting
+        var BOOT_TIMEOUT_MS = 8000;
+        try {
+          setTimeout(function(){
+            try {
+              // main.tsx setea esta marca cuando React montó
+              if (!(globalThis /** @type {any} */)['__APP_MOUNTED__']) {
+                var u = new URL(location.href);
+                u.searchParams.set('v', Date.now().toString());
+                location.replace(u.toString());
+              }
+            } catch (err) { console.warn('boot overlay watchdog failed', err); }
+          }, BOOT_TIMEOUT_MS);
+        } catch (err) { console.warn('boot overlay could not start watchdog', err); }
       })();
     </script>
 
@@ -73,7 +87,7 @@
           if (!isLocal && location.protocol !== 'https:') {
             location.href = 'https://' + location.host + location.pathname + location.search + location.hash;
           }
-        } catch (e) {}
+        } catch (e) { console.warn('https redirect snippet failed', e); }
       })();
     </script>
 
