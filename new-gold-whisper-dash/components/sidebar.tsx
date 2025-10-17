@@ -27,8 +27,7 @@ type Item = {
 const nav: Item[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "CRM", href: "/crm", icon: Users },
-  { label: "Publicidad", href: "/advertising", icon: Megaphone },
-  { label: "Dashboard Visual", href: "/dashboard", icon: TrendingUp },
+  { label: "Publicidad", href: "/publicidad", icon: Megaphone },
   { label: "Ventas", href: "/ventas", icon: ShoppingCart },
   { label: "Facturación", href: "/facturacion", icon: FileText },
   { label: "Entregas", href: "/entregas", icon: Package },
