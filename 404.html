@@ -3,22 +3,36 @@
   <head>
     <meta charset="utf-8" />
     <title>Redirecting…</title>
-    <!-- Redirect to the GitHub Pages project subpath -->
-    <meta http-equiv="refresh" content="0; url=/gold-whisper-dashboard/" />
+  <!-- Redirect logic for GitHub Pages project or custom domain -->
     <script>
       (function () {
-        var basePath = '/gold-whisper-dashboard';
+        // If hosted under a custom domain with a CNAME, we point to root
+        // Otherwise, fallback to the project subpath
+        var basePath = (function(){
+          try {
+            // Injected by Vite at build-time if defined
+            var injected = import.meta && import.meta.env && import.meta.env.BASE_URL;
+            if (injected && injected !== '/') return injected.replace(/\/$/, '');
+          } catch(e) {
+            // Fallback: no BASE_URL in this context
+          }
+          // Heuristic: if domain is github.io, use the repo subpath; else root
+          var isGithub = /github\.io$/.test(location.host);
+          return isGithub ? '/gold-whisper-dashboard' : '';
+        })();
         try {
           sessionStorage.setItem(
             'redirectAfterReload',
             location.pathname + location.search + location.hash
           );
-        } catch (e) {}
-        var l = window.location;
-        var target = basePath + '/';
-        if (l.origin && l.origin.indexOf('github.io') !== -1) {
+        } catch (e) {
+          // Fallback: sessionStorage no disponible
+        }
+  var l = globalThis.location;
+        var target = (basePath || '') + '/';
+  if (l.origin && l.origin.includes('github.io')) {
           // Ensure absolute URL to avoid mixed base issues
-          target = l.protocol + '//' + l.host + basePath + '/';
+          target = l.protocol + '//' + l.host + (basePath || '') + '/';
         }
         l.replace(target);
       })();
