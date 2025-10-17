@@ -37,7 +37,9 @@ if (isProd && CHATWOOT_ENABLED) {
   if (!CHATWOOT_TOKEN) missing.push("VITE_CHATWOOT_WEBSITE_TOKEN");
   if (!CHATWOOT_ACCOUNT_ID) missing.push("VITE_CHATWOOT_ACCOUNT_ID");
   if (missing.length) {
-    throw new Error(`Faltan variables de entorno para Chatwoot en producción: ${missing.join(", ")}. Configúralas en .env y/o Secrets.`);
+    console.warn(
+      `[Chatwoot] Variables faltantes en producción: ${missing.join(", ")}. El módulo funcionará en modo degradado.`
+    );
   }
 }
 

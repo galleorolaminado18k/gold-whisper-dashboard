@@ -7,20 +7,67 @@ const SUPABASE_ANON_KEY = (
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? import.meta.env.VITE_SUPABASE_ANON_KEY ?? ""
 ).toString();
 
-if (!SUPABASE_URL || !/^https?:\/\//.test(SUPABASE_URL)) {
-  throw new Error("[Supabase] Missing or invalid VITE_SUPABASE_URL. Configure it in your .env");
+function createDisabledQueryResult() {
+  const result: any = {
+    data: [],
+    error: new Error("[Supabase disabled] No credentials configured"),
+    select: (..._args: any[]) => result,
+    eq: (..._args: any[]) => result,
+    order: (..._args: any[]) => result,
+    limit: (..._args: any[]) => result,
+  };
+  return result;
 }
-if (!SUPABASE_ANON_KEY) {
-  throw new Error("[Supabase] Missing VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY). Configure it in your .env");
+
+function createDisabledSupabase(): any {
+  const noop = () => {};
+  const disabledAuth = {
+    onAuthStateChange: (_cb: any) => ({ data: { subscription: { unsubscribe: noop } } }),
+    getSession: async () => ({ data: { session: null } }),
+    signInWithPassword: async () => ({ error: new Error("[Supabase disabled] signInWithPassword") }),
+    signUp: async () => ({ error: new Error("[Supabase disabled] signUp") }),
+    signOut: async () => ({ error: new Error("[Supabase disabled] signOut") }),
+  };
+  const disabledFrom = (_table: string) => createDisabledQueryResult();
+  return { auth: disabledAuth, from: disabledFrom };
+}
+
+const hasValidUrl = !!SUPABASE_URL && /^https?:\/\//.test(SUPABASE_URL);
+const hasKey = !!SUPABASE_ANON_KEY;
+
+// Do not throw in production to avoid blank screens; fall back to a disabled client instead.
+let client: any;
+if (hasValidUrl && hasKey) {
+  client = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      storage: localStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  });
+} else {
+  if (import.meta.env.DEV) {
+    // During development it's useful to fail fast
+    // but still avoid crashing the whole app hard.
+    console.warn(
+      "[Supabase] Credenciales faltantes o inválidas en .env. Usando cliente deshabilitado en DEV."
+    );
+  } else {
+    console.warn("[Supabase] No se configuraron credenciales. Ejecutando en modo sin conexión.");
+  }
+  client = createDisabledSupabase();
 }
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
-
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+type MinimalSupabase = {
   auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+    onAuthStateChange: (...args: any[]) => any;
+    getSession: (...args: any[]) => Promise<any>;
+    signInWithPassword: (...args: any[]) => Promise<any>;
+    signUp: (...args: any[]) => Promise<any>;
+    signOut: (...args: any[]) => Promise<any>;
+  };
+  from: (table: string) => any;
+};
+export const supabase = client as unknown as MinimalSupabase;
