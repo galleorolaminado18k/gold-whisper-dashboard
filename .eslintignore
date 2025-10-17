@@ -1,0 +1,11 @@
+# Ignorar dependencias y build
+node_modules/
+dist/
+.vite/
+
+# Ignorar subproyecto heredado para lint del root
+gold-whisper-dashboard/
+
+# Otros
+coverage/
+*.log

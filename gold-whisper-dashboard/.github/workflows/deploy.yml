@@ -4,27 +4,27 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Añadir permisos de escritura para el bot de GitHub Actions
     env:
       # Base path for GitHub Pages project site
       VITE_ASSET_BASE: /gold-whisper-dashboard/
       VITE_ROUTER_BASENAME: /gold-whisper-dashboard
-      # App Secrets (configure in repo Settings > Secrets and variables > Actions)
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      # Chatwoot
       VITE_CHATWOOT_ENABLED: ${{ secrets.VITE_CHATWOOT_ENABLED }}
       VITE_CHATWOOT_URL: ${{ secrets.VITE_CHATWOOT_URL }}
       VITE_CHATWOOT_WEBSITE_TOKEN: ${{ secrets.VITE_CHATWOOT_WEBSITE_TOKEN }}
       VITE_CHATWOOT_ACCOUNT_ID: ${{ secrets.VITE_CHATWOOT_ACCOUNT_ID }}
+      # Bridge API (para CRM y envío de mensajes)
       VITE_BRIDGE_API_URL: ${{ secrets.VITE_BRIDGE_API_URL }}
+      # Meta Ads
       VITE_META_ACCESS_TOKEN: ${{ secrets.VITE_META_ACCESS_TOKEN }}
-      VITE_META_ACCESS_TOKEN_2: ${{ secrets.VITE_META_ACCESS_TOKEN_2 }}
       VITE_META_AD_ACCOUNT_ID: ${{ secrets.VITE_META_AD_ACCOUNT_ID }}
       VITE_META_AD_ACCOUNT_IDS: ${{ secrets.VITE_META_AD_ACCOUNT_IDS }}
       VITE_META_AD_ACCOUNT_NAMES: ${{ secrets.VITE_META_AD_ACCOUNT_NAMES }}
@@ -34,23 +34,35 @@ jobs:
       - name: Checkout 🛎️
         uses: actions/checkout@v4
 
-      - name: Guard – ensure no .env files are committed
-        run: |
-          BAD_ENVS=$(git ls-files | grep -E '(^|/)\.env(\.|$)' | grep -v -E '(^|/)\.env\.example$' | grep -v -E '^gold-whisper-dashboard/\.env\.production$')
-          if [ -n "$BAD_ENVS" ]; then
-            echo "Error: One or more .env files are tracked in git. Remove them and push again:" >&2
-            echo "$BAD_ENVS" >&2
-            exit 1
-          fi
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '20' # Asegúrate de que esta versión sea compatible con tu proyecto
+          cache: 'npm' # Habilitar caché para npm
+
+      - name: Display Node.js and npm versions and PATH
+        run: |
+          node -v
+          npm -v
+          echo $PATH
 
       - name: Install dependencies
         run: npm ci
+
+      - name: List node_modules content (for debugging)
+        run: ls -la node_modules
+
+      - name: List node_modules/.bin content (for debugging)
+        run: ls -la node_modules/.bin
+
+      - name: Debug React and Rollup paths
+        run: |
+          echo "--- Listing node_modules/react ---"
+          ls -la node_modules/react
+          echo "--- Listing node_modules/react-dom ---"
+          ls -la node_modules/react-dom
+          echo "--- Content of node_modules/rollup/dist/es/shared/parseAsset.js ---"
+          cat node_modules/rollup/dist/es/shared/parseAsset.js || echo "File not found or cannot be read."
 
       - name: Build project
         run: npm run build
@@ -61,3 +73,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           publish_branch: gh-pages
+

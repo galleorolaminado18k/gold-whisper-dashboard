@@ -1,5 +1,5 @@
 ﻿// src/App.tsx
-import React from "react";
+import React, { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -38,27 +38,30 @@ const App: React.FC = () => {
       ? ""
       : rawBase.replace(/\/+$/, "") || "";
 
+  // Restore deep-link after GitHub Pages 404 redirect
+  useEffect(() => {
+    const key = 'redirectAfterReload';
+    const pending = sessionStorage.getItem(key);
+    if (!pending) return;
+    sessionStorage.removeItem(key);
+    const target = pending.replace(/^\/+/, '');
+    const current = location.pathname.replace(/^\/+/, '');
+    if (current !== target.replace(/^\/+/, '')) {
+      let next = `${normalizedBase}/${target}`;
+  // collapse multiple slashes (ES2020-safe)
+  while (/\/\//.test(next)) next = next.replace(/\/\//g, '/');
+      // ensure leading slash
+      if (!next.startsWith('/')) next = '/' + next;
+      history.replaceState(null, '', next);
+    }
+  }, [normalizedBase]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter basename={normalizedBase}>
-          {/* Restore deep-link after GitHub Pages 404 redirect */}
-          {(() => {
-            try {
-              const key = 'redirectAfterReload';
-              const pending = sessionStorage.getItem(key);
-              if (pending) {
-                sessionStorage.removeItem(key);
-                const target = pending.replace(/^\/+/, '');
-                if (window.location.pathname.replace(/^\/+/, '') !== target.replace(/^\/+/, '')) {
-                  // Use history API to avoid full reload
-                  window.history.replaceState(null, '', `${normalizedBase}/${target}`.replace(/\/+/g, '/'));
-                }
-              }
-            } catch (e) {}
-          })()}
           <AuthProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />

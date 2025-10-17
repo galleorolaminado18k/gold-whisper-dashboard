@@ -57,6 +57,20 @@ npm run dev
 
 Nota: Para GitHub Pages como subpágina, la app se sirve bajo `/gold-whisper-dashboard/` y ya está configurado en el workflow y en Vite (VITE_ASSET_BASE/VITE_ROUTER_BASENAME).
 
+## Sincronizar Secrets desde .env (Windows PowerShell)
+
+1. Instala GitHub CLI y autentícate: https://cli.github.com/
+2. Crea un archivo `.env` en la raíz (NO lo comites) basado en `.env.example`.
+3. Ejecuta el script:
+
+```powershell
+./scripts/sync-env-to-gh-secrets.ps1 -Path .env
+```
+
+Esto leerá todas las claves `VITE_*` y las subirá como Secrets del repo sin imprimir sus valores.
+
+Nota: si encuentras algún `.env.production` heredado dentro de subcarpetas antiguas, elimínalo o renómbralo localmente. El workflow falla si detecta `.env*` versionados.
+
 ## Notas de seguridad
 
 - No guardes tokens largos ni claves privadas en el repo.

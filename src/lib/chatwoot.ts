@@ -21,11 +21,25 @@ export type CWConversation = {
   labels?: string[];
 };
 
-// ===== Config del bridge local =====
-const API = import.meta.env.VITE_BRIDGE_API_URL || "http://localhost:4000";
-const CHATWOOT_URL = import.meta.env.VITE_CHATWOOT_URL || "http://localhost:3020";
-const CHATWOOT_TOKEN = import.meta.env.VITE_CHATWOOT_WEBSITE_TOKEN || "";
-const CHATWOOT_ACCOUNT_ID = import.meta.env.VITE_CHATWOOT_ACCOUNT_ID || "1";
+// ===== Config del bridge/local =====
+// En desarrollo permitimos defaults locales; en producción exigimos variables
+const isProd = import.meta.env.PROD === true;
+const CHATWOOT_ENABLED = (import.meta.env.VITE_CHATWOOT_ENABLED ?? "false").toString() === "true";
+const API = (import.meta.env.VITE_BRIDGE_API_URL as string | undefined) || (isProd ? "" : "http://localhost:4000");
+const CHATWOOT_URL = (import.meta.env.VITE_CHATWOOT_URL as string | undefined) || (isProd ? "" : "http://localhost:3020");
+const CHATWOOT_TOKEN = (import.meta.env.VITE_CHATWOOT_WEBSITE_TOKEN as string | undefined) || "";
+const CHATWOOT_ACCOUNT_ID = (import.meta.env.VITE_CHATWOOT_ACCOUNT_ID as string | undefined) || (isProd ? "" : "1");
+
+if (isProd && CHATWOOT_ENABLED) {
+  const missing: string[] = [];
+  if (!API) missing.push("VITE_BRIDGE_API_URL");
+  if (!CHATWOOT_URL) missing.push("VITE_CHATWOOT_URL");
+  if (!CHATWOOT_TOKEN) missing.push("VITE_CHATWOOT_WEBSITE_TOKEN");
+  if (!CHATWOOT_ACCOUNT_ID) missing.push("VITE_CHATWOOT_ACCOUNT_ID");
+  if (missing.length) {
+    throw new Error(`Faltan variables de entorno para Chatwoot en producción: ${missing.join(", ")}. Configúralas en .env y/o Secrets.`);
+  }
+}
 
 // Exportar para uso en otros archivos si es necesario
 export const CHATWOOT_CONFIG = {
