@@ -12,15 +12,11 @@ jobs:
     permissions:
       contents: write
     env:
-      # Base path for GitHub Pages project site
       VITE_ASSET_BASE: ./
       VITE_ROUTER_BASENAME: ""
-      # Allow offline mode if Supabase is not configured
       VITE_ENABLE_FALLBACK_AUTH: true
-      # Si está vacío, cualquier email puede usar el modo invitado
       VITE_FALLBACK_AUTH_EMAIL: ""
       VITE_FALLBACK_AUTH_NAME: "Usuario Invitado"
-      # App Secrets (configure in repo Settings > Secrets and variables > Actions)
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       VITE_CHATWOOT_ENABLED: ${{ secrets.VITE_CHATWOOT_ENABLED }}
@@ -36,12 +32,11 @@ jobs:
       VITE_META_BUSINESS_ID: ${{ secrets.VITE_META_BUSINESS_ID }}
 
     steps:
-      - name: Checkout 🛎️
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Guard – ensure no .env files are committed
+      - name: Guard - ensure no .env files are committed
         run: |
-          # Grep returns exit code 1 when no matches; append `|| true` to avoid failing the step under `set -e`.
           BAD_ENVS=$(git ls-files | grep -E '(^|/)\.env(\.|$)' | grep -v -E '(^|/)\.env\.example$' | grep -v -E '^gold-whisper-dashboard/\.env\.production$' || true)
           if [ -n "$BAD_ENVS" ]; then
             echo "Error: One or more .env files are tracked in git. Remove them and push again:" >&2
