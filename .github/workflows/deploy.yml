@@ -2,80 +2,54 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches:
-      - main
+    branches: [ gh-pages ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # Añadir permisos de escritura para el bot de GitHub Actions
-    env:
-      VITE_SUPABASE_URL: https://evjgujiyjplvbudgfiwr.supabase.co
-      VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2amd1aml5anBsdmJ1ZGdmaXdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwOTc4NzIsImV4cCI6MjA3NTY3Mzg3Mn0.EnJIuzxjw6tpURxclEZ60ySDqKkz6vltjSQPEWHtYzI
-      # Chatwoot
-      VITE_CHATWOOT_ENABLED: true
-      VITE_CHATWOOT_URL: https://app.chatwoot.com
-      VITE_CHATWOOT_WEBSITE_TOKEN: c5S9SqxkumtX7GAZdc9LQnri
-      VITE_BRIDGE_API_URL: https://chatwoot-proxy-galle.galleorolaminado18k.workers.dev
-      VITE_CHATWOOT_ACCOUNT_ID: 138167
-      # Meta Ads API - Token único para AMBAS cuentas
-      VITE_META_BUSINESS_ID: 1067806144007153
-      # Token con acceso completo a ambas cuentas (360084149294973 y 5518735214914409)
-      VITE_META_ACCESS_TOKEN: EAAC4zHE6iMYBPlPvsaZAlI5GF2FXZBLXa0C0D3gLdyDcgOtZC4uRK9GDN8v2wo1ZCOTZCihoVYy4gPUa2xe2fpQmFGZBCtOSP0XLHY0SMbZCQZCMmUryeSkyScbTBD7FyFOAeZAPlvmSOk47aLCIaPgDXFzUkRF3RvHPdOcYno5ZBpx0fsZCxZB2vZBzXguoinqBOvetlawZDZD
-      # Token secundario (mismo para compatibilidad con código multi-token)
-      VITE_META_ACCESS_TOKEN_2: EAAC4zHE6iMYBPlPvsaZAlI5GF2FXZBLXa0C0D3gLdyDcgOtZC4uRK9GDN8v2wo1ZCOTZCihoVYy4gPUa2xe2fpQmFGZBCtOSP0XLHY0SMbZCQZCMmUryeSkyScbTBD7FyFOAeZAPlvmSOk47aLCIaPgDXFzUkRF3RvHPdOcYno5ZBpx0fsZCxZB2vZBzXguoinqBOvetlawZDZD
-      # AMBAS cuentas publicitarias activas (IDs corregidos)
-      VITE_META_AD_ACCOUNT_IDS: 1281508182357459,5518735214914409
-      VITE_META_AD_ACCOUNT_NAMES: Cuenta 1,GALLE 18K DETAL
-      VITE_META_AD_ACCOUNT_ID: 1281508182357459
-      VITE_META_AD_ACCOUNT_NAME: Cuenta 1
-      # Fallback Auth
-      VITE_FALLBACK_AUTH_EMAIL: demo@dashboard.galle18k.com
-      VITE_ENABLE_FALLBACK_AUTH: true
-      VITE_FALLBACK_ALLOWED_EMAILS: demo@dashboard.galle18k.com,galleorolaminado18k@gmail.com
-
     steps:
-      - name: Checkout 🛎️
+      - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
+        
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Asegúrate de que esta versión sea compatible con tu proyecto
-          cache: 'npm' # Habilitar caché para npm
-
-      - name: Display Node.js and npm versions and PATH
-        run: |
-          node -v
-          npm -v
-          echo $PATH
-
+          node-version: '18'
+          
       - name: Install dependencies
-        run: npm ci
-
-      - name: List node_modules content (for debugging)
-        run: ls -la node_modules
-
-      - name: List node_modules/.bin content (for debugging)
-        run: ls -la node_modules/.bin
-
-      - name: Debug React and Rollup paths
-        run: |
-          echo "--- Listing node_modules/react ---"
-          ls -la node_modules/react
-          echo "--- Listing node_modules/react-dom ---"
-          ls -la node_modules/react-dom
-          echo "--- Content of node_modules/rollup/dist/es/shared/parseAsset.js ---"
-          cat node_modules/rollup/dist/es/shared/parseAsset.js || echo "File not found or cannot be read."
-
-      - name: Build project
+        run: npm ci --legacy-peer-deps
+        
+      - name: Build
         run: npm run build
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+        
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          publish_branch: gh-pages
-          cname: dashboard.galle18k.com # Opcional: si tienes un dominio personalizado
+          path: ./out
+          
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
