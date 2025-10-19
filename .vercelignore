@@ -1,0 +1,34 @@
+# Ignorar backups y carpetas antiguas
+backup_*
+src/
+gold-whisper-dash-main/
+gold-whisper-dashboard/
+bolt.diy/
+Users/
+
+# Ignorar archivos de desarrollo
+*.log
+*.sh
+*.ps1
+.env.local
+.env*.local
+
+# Node modules (ya ignorado por defecto pero por si acaso)
+node_modules/
+
+# Archivos de documentación
+*.md
+!README.md
+
+# Scripts de deployment
+scripts/
+cloudflare-worker/
+api/
+
+# Configuraciones locales
+nginx*.conf
+docker-compose.yml
+Dockerfile
+fly.toml
+ecosystem.config.js
+
