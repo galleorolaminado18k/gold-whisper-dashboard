@@ -1,7 +1,0 @@
-﻿
-// #region Advertising Dashboard
-route AdvertisingRoute { path: "/advertising", to: AdvertisingPage }
-page AdvertisingPage {
-  component: import { AdvertisingDashboard } from "@src/client/pages/AdvertisingDashboard.tsx"
-}
-// #endregion Advertising
