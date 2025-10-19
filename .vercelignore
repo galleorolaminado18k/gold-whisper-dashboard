@@ -6,6 +6,13 @@ gold-whisper-dashboard/
 bolt.diy/
 Users/
 
+# Archivos de Vite (proyecto anterior)
+vite.config.ts
+vite.config.js
+index.html
+tsconfig.app.json
+tsconfig.node.json
+
 # Ignorar archivos de desarrollo
 *.log
 *.sh

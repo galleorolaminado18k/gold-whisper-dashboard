@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+// Con dominio personalizado (dashboard.galle18k.com), la base debe ser '/'
 const base = process.env.VITE_ASSET_BASE?.trim()
   ? process.env.VITE_ASSET_BASE
   : "/";

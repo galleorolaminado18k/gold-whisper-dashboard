@@ -1,0 +1,19 @@
+# VARIABLES DE ENTORNO PARA VERCEL
+# Copia y pega estas variables en Vercel antes de hacer deploy
+
+# === SUPABASE ===
+NEXT_PUBLIC_SUPABASE_URL=tu_url_de_supabase_aqui
+NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key_aqui
+SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key_aqui
+
+# === MIPAQUETE ===
+MIPAQUETE_API_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NzExOWRjNDMzNjk2M2YzMzBlYjFjZTYiLCJuYW1lIjoiQ29tZXJjaWFsaXphZG9yYSIsInN1cm5hbWUiOiJnYWxlMThrIiwiZW1haWwiOiJnYWxsZW9yb2xhbWluYWRvMThrQGdtYWlsLmNvbSIsImNlbGxQaG9uZSI6IjMwMTY4NDUwMjYiLCJjcmVhdGVkQXQiOiIyMDI0LTEwLTE3VDIzOjI5OjA4LjAxNFoiLCJkYXRlIjoiMjAyNS0wOC0xOSAxMDoyMDoyNCIsImlhdCI6MTc1NTYxNjgyNH0.LHBLIsBCQlNM6WlnB514dN00dR7LcPjIQcYtB62hEA
+MIPAQUETE_SESSION_TRACKER=a0c96ea6-b22d-4fb7-a278-850678d5429c
+
+# === X.AI / GROK ===
+XAI_API_KEY=tu_xai_api_key_aqui
+NEXT_PUBLIC_XAI_API_KEY=tu_xai_api_key_aqui
+
+# NOTA: Reemplaza "tu_url_de_supabase_aqui", "tu_anon_key_aqui", etc. 
+# con tus valores reales de Supabase y X.AI
+
